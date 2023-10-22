@@ -74,19 +74,17 @@ export default function Uses() {
           </Tool>
         </ToolsSection>
         <ToolsSection title="Development tools">
-          <Tool title="Sublime Text 4">
-            I don’t care if it’s missing all of the fancy IDE features everyone
-            else relies on, Sublime Text is still the best text editor ever
-            made.
+          <Tool title="Visual Studio Code">
+            I still use Vim when I have no access to a more desktop oriented
+            IDE. However, you can bet I will be using VS Code whenever I have
+            access to that. VS Code is versatile, well supported and I
+            appreciate the varying color themes that help reduce eye strain for
+            me.
           </Tool>
-          <Tool title="iTerm2">
-            I’m honestly not even sure what features I get with this that aren’t
-            just part of the macOS Terminal but it’s what I use.
-          </Tool>
-          <Tool title="TablePlus">
-            Great software for working with databases. Has saved me from
-            building about a thousand admin interfaces for my various projects
-            over the years.
+          <Tool title="Drawio">
+            I like visualizing things. Whenever I can put forth a visual
+            representation of a project I am working on, it helps me move
+            faster. Now, that is why I use drawio, a lot.
           </Tool>
         </ToolsSection>
         <ToolsSection title="Design">
