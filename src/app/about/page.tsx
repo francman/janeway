@@ -111,7 +111,14 @@ export default function About() {
               computer engineering, and I still keep up with my skills in that
               but I've always liked to explore. Discovering Systems Engineering
               was perfect. I've worked as a Systems Engineer ever since I got
-              out of school.
+              out of school. I also extended my knowledge in the trade of
+              Systems Engineering with a&nbsp;
+              <a
+                href="https://www.youtube.com/watch?v=yzPiP-gjpds&ab_channel=MITxPRO"
+                className="text-blue-500 underline"
+              >
+                Professional Course in Systems Engineering from MIT.
+              </a>
             </p>
           </div>
         </div>
