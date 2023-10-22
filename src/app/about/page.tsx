@@ -69,35 +69,49 @@ export default function About() {
         </div>
         <div className="lg:order-first lg:row-span-2">
           <h1 className="text-4xl font-bold tracking-tight text-zinc-800 dark:text-zinc-100 sm:text-5xl">
-            Hi, I’m Frank Manu. I'm based in Greater Boston. I build complex
-            systems.
+            Hi, I’m Frank Kofi Manu, based in Greater Boston. I build systems.
           </h1>
           <div className="mt-6 space-y-7 text-base text-zinc-600 dark:text-zinc-400">
             <p>
-              I’ve loved making things for as long as I can remember, and wrote
-              my first program when I was 6 years old, just two weeks after my
-              mom brought home the brand new Macintosh LC 550 that I taught
-              myself to type on.
+              <b>Call me Kofi</b>. I was born on a Friday and amongst my people
+              Kofi is my soul name. I was gifted my first computer at age 11, a
+              Compaq Pentium 1 computer. It had a floppy disk drive. I learned
+              to type with Mavis Beacon Teaches Typing. That lady was strict.
+              But, I really wanted Super Mario on my PC, so I had no choice but
+              to type.
             </p>
             <p>
-              The only thing I loved more than computers as a kid was space.
-              When I was 8, I climbed the 40-foot oak tree at the back of our
-              yard while wearing my older sister’s motorcycle helmet, counted
-              down from three, and jumped — hoping the tree was tall enough that
-              with just a bit of momentum I’d be able to get to orbit.
+              I'm a trekkie. Kathryn Janeway of USS Voyager is my favorite
+              captain. I always wanted to be a surgeon growing up, however, I
+              will admit that my interests have always been varied. At age 14, I
+              went to&nbsp;
+              <a
+                href="https://www.instagram.com/prempehcollege"
+                className="font-semibold text-green-600 underline"
+              >
+                Prempeh College
+              </a>
+              , an all boys boarding school, where I studied General Science. I
+              was on the debate team, served as a dorm prefect, and founded the
+              local Robotics Team Chapter. There were lots of competitions and
+              awards I helped win. I liked the glory of it all.
             </p>
             <p>
-              I spent the next few summers indoors working on a rocket design,
-              while I recovered from the multiple surgeries it took to fix my
-              badly broken legs. It took nine iterations, but when I was 15 I
-              sent my dad’s Blackberry into orbit and was able to transmit a
-              photo back down to our family computer from space.
+              I left Prempeh College in the final term of my senior year for
+              America. I would soon realize that going to medical school after
+              secondary/high school was not the norm here. Although, I had been
+              studying for it, even if I passed the MCAT, I didn't have the
+              required 4-year degree. I needed to pivot. I had always liked
+              engineering too, but what field? I had my eyes on Mechanical but I
+              tried Electrical and got hooked. I went further for an MSc. in
+              Computer Engineering.
             </p>
             <p>
-              Today, I’m the founder of Planetaria, where we’re working on
-              civilian space suits and manned shuttle kits you can assemble at
-              home so that the next generation of kids really <em>can</em> make
-              it to orbit — from the comfort of their own backyards.
+              Today, I work as a Systems Engineer. I love electrical and
+              computer engineering, and I still keep up with my skills in that
+              but I've always liked to explore. Discovering Systems Engineering
+              was perfect. I've worked as a Systems Engineer ever since I got
+              out of school.
             </p>
           </div>
         </div>
@@ -106,7 +120,11 @@ export default function About() {
             <SocialLink href="https://twitter.com/francman_" icon={TwitterIcon}>
               Follow on Twitter
             </SocialLink>
-            <SocialLink href="#" icon={InstagramIcon} className="mt-4">
+            <SocialLink
+              href="https://www.instagram.com/francman_"
+              icon={InstagramIcon}
+              className="mt-4"
+            >
               Follow on Instagram
             </SocialLink>
             <SocialLink
