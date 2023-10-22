@@ -35,15 +35,15 @@ function Tool({
 }
 
 export const metadata = {
-  title: 'Uses',
-  description: 'Software I use, gadgets I love, and other things I recommend.',
+  title: 'Lab233',
+  description: "Just the favorites in my home lab if you're ever wondering.",
 }
 
 export default function Uses() {
   return (
     <SimpleLayout
-      title="Software I use, gadgets I love, and other things I recommend."
-      intro="I get asked a lot about the things I use to build software, stay productive, or buy to fool myself into thinking I’m being productive when I’m really just procrastinating. Here’s a big list of all of my favorite stuff."
+      title="Tools and gadgets I use."
+      intro="Just the favorites in my home lab if you're ever wondering."
     >
       <div className="space-y-20">
         <ToolsSection title="Workstation">
