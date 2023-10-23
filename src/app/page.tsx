@@ -11,11 +11,10 @@ import {
   LinkedInIcon,
   TwitterIcon,
 } from '@/components/SocialIcons'
-import logoAirbnb from '@/images/logos/airbnb.svg'
-import logoFacebook from '@/images/logos/facebook.svg'
-import logoPlanetaria from '@/images/logos/planetaria.svg'
-import logoStarbucks from '@/images/logos/starbucks.svg'
-import image1 from '@/images/photos/image-1.jpg'
+import logoCarrier from '@/images/logos/carrier.svg'
+import logoAmazon from '@/images/logos/amazon.svg'
+import logoThermoFisher from '@/images/logos/thermoFisherScientific.svg'
+import image1 from '@/images/photos/image-1.webp'
 import image2 from '@/images/photos/image-2.jpg'
 import image3 from '@/images/photos/image-3.jpg'
 import image4 from '@/images/photos/image-4.jpg'
@@ -187,35 +186,28 @@ function Role({ role }: { role: Role }) {
 function Resume() {
   let resume: Array<Role> = [
     {
-      company: 'Planetaria',
-      title: 'CEO',
-      logo: logoPlanetaria,
-      start: '2019',
+      company: 'Amazon',
+      title: 'Robotic SysDev Engineer',
+      logo: logoAmazon,
+      start: '2021',
       end: {
         label: 'Present',
         dateTime: new Date().getFullYear().toString(),
       },
     },
     {
-      company: 'Airbnb',
-      title: 'Product Designer',
-      logo: logoAirbnb,
-      start: '2014',
-      end: '2019',
+      company: 'Carrier [United Technologies Corporation]',
+      title: 'Systems Engineer',
+      logo: logoCarrier,
+      start: '2018',
+      end: '2021',
     },
     {
-      company: 'Facebook',
-      title: 'iOS Software Engineer',
-      logo: logoFacebook,
-      start: '2011',
-      end: '2014',
-    },
-    {
-      company: 'Starbucks',
-      title: 'Shift Supervisor',
-      logo: logoStarbucks,
-      start: '2008',
-      end: '2011',
+      company: 'ThermoFisher Scientific',
+      title: 'Electrical Engineering Co-op',
+      logo: logoThermoFisher,
+      start: '2017',
+      end: '2017',
     },
   ]
 
@@ -231,7 +223,7 @@ function Resume() {
         ))}
       </ol>
       <Button href="#" variant="secondary" className="group mt-6 w-full">
-        Download CV
+        Download Resume
         <ArrowDownIcon className="h-4 w-4 stroke-zinc-400 transition group-active:stroke-zinc-600 dark:group-hover:stroke-zinc-50 dark:group-active:stroke-zinc-50" />
       </Button>
     </div>
@@ -276,29 +268,30 @@ export default async function Home() {
             Electrical, computer and systems engineer.
           </h1>
           <p className="mt-6 text-base text-zinc-600 dark:text-zinc-400">
-            Hi, Frank here, an electrical, computer and systems engineer based
-            in Greater Boston. I'm a Robotic Systems Development Engineer at
-            Amazon, where we develop and scale robots and mechatronic systems
-            that process billions of customer orders everyday.
+            Hi, I'm Frank, you can also call me Kofi. I'm an electrical,
+            computer and systems engineer based in Greater Boston. I'm a Robotic
+            Systems Development Engineer at Amazon, where we develop and scale
+            robots and mechatronic systems that process billions of customer
+            orders everyday.
           </p>
           <div className="mt-6 flex gap-6">
             <SocialLink
-              href="https://twitter.com"
+              href="https://twitter.com/francman_"
               aria-label="Follow on Twitter"
               icon={TwitterIcon}
             />
             <SocialLink
-              href="https://instagram.com"
+              href="https://instagram.com/francman_"
               aria-label="Follow on Instagram"
               icon={InstagramIcon}
             />
             <SocialLink
-              href="https://github.com"
+              href="https://github.com/francman"
               aria-label="Follow on GitHub"
               icon={GitHubIcon}
             />
             <SocialLink
-              href="https://linkedin.com"
+              href="https://linkedin.com/in/frankmanu500"
               aria-label="Follow on LinkedIn"
               icon={LinkedInIcon}
             />

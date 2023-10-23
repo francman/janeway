@@ -7,11 +7,11 @@ import '@/styles/tailwind.css'
 
 export const metadata: Metadata = {
   title: {
-    template: '%s - Frank Manu',
-    default: 'Frank Manu',
+    template: '%s - Frank Kofi Manu',
+    default: 'Frank Kofi Manu',
   },
   description:
-    "Hi, I’m Frank Manu. I'm based in Greater Boston. I build complex systems.",
+    "Hi, I’m Frank Kofi Manu. I'm based in Greater Boston. I build complex systems.",
   alternates: {
     types: {
       'application/rss+xml': `${process.env.NEXT_PUBLIC_SITE_URL}/feed.xml`,
