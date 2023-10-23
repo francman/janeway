@@ -115,7 +115,7 @@ export default function About() {
               Systems Engineering with a&nbsp;
               <a
                 href="https://www.youtube.com/watch?v=yzPiP-gjpds&ab_channel=MITxPRO"
-                className="text-blue-500 underline"
+                className="font-semibold text-blue-500 underline"
               >
                 Professional Course in Systems Engineering from MIT.
               </a>
