@@ -1,13 +1,11 @@
-import { ArticleLayout } from '@/components/ArticleLayout'
-import Image from 'next/image'
-import designSystem from './planetaria-design-system.png'
+import { ArticleLayout } from '@/components/ArticleLayoutRSC'
 
 export const article = {
   author: 'Adam Wathan',
-  date: '2022-09-05',
-  title: 'Crafting a design system for a multiplanetary future',
+  date: '2022-07-14',
+  title: 'Rewriting the cosmOS kernel in Rust',
   description:
-    'Most companies try to stay ahead of the curve when it comes to visual design, but for Planetaria we needed to create a brand that would still inspire us 100 years from now when humanity has spread across our entire solar system.',
+    'When we released the first version of cosmOS last year, it was written in Go. Go is a wonderful programming language, but it’s been a while since I’ve seen an article on the front page of Hacker News about rewriting some important tool in Go and I see articles on there about rewriting things in Rust every single week.',
 }
 
 export const metadata = {
@@ -17,11 +15,23 @@ export const metadata = {
 
 export default (props) => <ArticleLayout article={article} {...props} />
 
-Most companies try to stay ahead of the curve when it comes to visual design, but for Planetaria we needed to create a brand that would still inspire us 100 years from now when humanity has spread across our entire solar system.
+When we released the first version of cosmOS last year, it was written in Go. Go is a wonderful programming language with a lot of benefits, but it’s been a while since I’ve seen an article on the front page of Hacker News about rewriting some important tool in Go and I see articles on there about rewriting things in Rust every single week.
 
-<Image src={designSystem} alt="" />
+```rust
+use ferris_says::say;
+use std::io::{stdout, BufWriter};
 
-I knew that to get it right I was going to have to replicate the viewing conditions of someone from the future, so I grabbed my space helmet from the closet, created a new Figma document, and got to work.
+fn main() {
+    let stdout = stdout();
+    let message = String::from("Hello fellow hackers");
+    let width = message.chars().count();
+
+    let mut writer = BufWriter::new(stdout.lock());
+    say(message.as_bytes(), width, &mut writer).unwrap();
+}
+```
+
+I derive a large amount of my self-worth from whether or not Hacker News is impressed with the work I'm doing, so when I realized this, I cancelled all of our existing projects and started migrating everything to Rust immediately.
 
 ## Sermone fata
 
