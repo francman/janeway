@@ -271,7 +271,7 @@ export default async function Home() {
             Hi, I'm Frank, you can also call me Kofi. I'm an electrical,
             computer and systems engineer based in Greater Boston. I'm a Robotic
             Systems Development Engineer at Amazon, where we develop and scale
-            robots and mechatronic systems that process billions of customer
+            robots and mechatronic systems that process millions of customer
             orders everyday.
           </p>
           <div className="mt-6 flex gap-6">
