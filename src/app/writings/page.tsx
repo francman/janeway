@@ -9,7 +9,9 @@ function Article({ article }: { article: ArticleWithSlug }) {
   return (
     <article className="md:grid md:grid-cols-4 md:items-baseline">
       <Card className="md:col-span-3">
-        <Card.Title href={`/a/${article.slug}`}>{article.title}</Card.Title>
+        <Card.Title href={`/writings/${article.slug}`}>
+          {article.title}
+        </Card.Title>
         <Card.Eyebrow
           as="time"
           dateTime={article.date}

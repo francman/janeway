@@ -12,11 +12,6 @@ export const metadata: Metadata = {
   },
   description:
     "Hi, I’m Frank Kofi Manu. I'm based in Greater Boston. I build complex systems.",
-  alternates: {
-    types: {
-      'application/rss+xml': `${process.env.NEXT_PUBLIC_SITE_URL}/feed.xml`,
-    },
-  },
 }
 
 export default function RootLayout({
