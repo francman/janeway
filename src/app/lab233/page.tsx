@@ -88,7 +88,7 @@ export default function Uses() {
           </Tool>
         </ToolsSection>
         <ToolsSection title="Design">
-          <Tool title="Figma">
+          <Tool title="Adobe Creative Cloud">
             We started using Figma as just a design tool but now it’s become our
             virtual whiteboard for the entire company. Never would have expected
             the collaboration features to be the real hook.

@@ -1,4 +1,6 @@
 import Image, { type ImageProps } from 'next/image'
+import { FaGraduationCap } from 'react-icons/fa'
+import { FaBriefcase } from 'react-icons/fa'
 import Link from 'next/link'
 import clsx from 'clsx'
 
@@ -13,6 +15,8 @@ import {
 } from '@/components/SocialIcons'
 import logoCarrier from '@/images/logos/carrier.svg'
 import logoAmazon from '@/images/logos/amazon.svg'
+import logoUmassLowell from '@/images/logos/umass-lowell.svg'
+import logoMITxPro from '@/images/logos/mit-xpro.svg'
 import logoThermoFisher from '@/images/logos/thermoFisherScientific.svg'
 import image1 from '@/images/photos/image-1.webp'
 import image2 from '@/images/photos/image-2.jpg'
@@ -39,29 +43,6 @@ function MailIcon(props: React.ComponentPropsWithoutRef<'svg'>) {
       />
       <path
         d="m4 6 6.024 5.479a2.915 2.915 0 0 0 3.952 0L20 6"
-        className="stroke-zinc-400 dark:stroke-zinc-500"
-      />
-    </svg>
-  )
-}
-
-function BriefcaseIcon(props: React.ComponentPropsWithoutRef<'svg'>) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      {...props}
-    >
-      <path
-        d="M2.75 9.75a3 3 0 0 1 3-3h12.5a3 3 0 0 1 3 3v8.5a3 3 0 0 1-3 3H5.75a3 3 0 0 1-3-3v-8.5Z"
-        className="fill-zinc-100 stroke-zinc-400 dark:fill-zinc-100/10 dark:stroke-zinc-500"
-      />
-      <path
-        d="M3 14.25h6.249c.484 0 .952-.002 1.316.319l.777.682a.996.996 0 0 0 1.316 0l.777-.682c.364-.32.832-.319 1.316-.319H21M8.75 6.5V4.75a2 2 0 0 1 2-2h2.5a2 2 0 0 1 2 2V6.5"
         className="stroke-zinc-400 dark:stroke-zinc-500"
       />
     </svg>
@@ -214,7 +195,7 @@ function Resume() {
   return (
     <div className="rounded-2xl border border-zinc-100 p-6 dark:border-zinc-700/40">
       <h2 className="flex text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-        <BriefcaseIcon className="h-6 w-6 flex-none" />
+        <FaBriefcase className="h-6 w-6 flex-none" />
         <span className="ml-3">Work</span>
       </h2>
       <ol className="mt-6 space-y-4">
@@ -226,6 +207,46 @@ function Resume() {
         Download Resume
         <ArrowDownIcon className="h-4 w-4 stroke-zinc-400 transition group-active:stroke-zinc-600 dark:group-hover:stroke-zinc-50 dark:group-active:stroke-zinc-50" />
       </Button>
+    </div>
+  )
+}
+
+function Education() {
+  let resume: Array<Role> = [
+    {
+      company: 'UMass Lowell',
+      title: 'MSc. Computer Engineering',
+      logo: logoUmassLowell,
+      start: '2018',
+      end: '2020',
+    },
+    {
+      company: 'MIT | xPro',
+      title: 'Systems Engineering & Architecture',
+      logo: logoMITxPro,
+      start: '2018',
+      end: '2019',
+    },
+    {
+      company: 'UMass Lowell',
+      title: 'BSc. Electrical Engineering',
+      logo: logoUmassLowell,
+      start: '2014',
+      end: '2018',
+    },
+  ]
+
+  return (
+    <div className="rounded-2xl border border-zinc-100 p-6 dark:border-zinc-700/40">
+      <h2 className="flex text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+        <FaGraduationCap className="h-6 w-6 flex-none" />
+        <span className="ml-3">Education</span>
+      </h2>
+      <ol className="mt-6 space-y-4">
+        {resume.map((role, roleIndex) => (
+          <Role key={roleIndex} role={role} />
+        ))}
+      </ol>
     </div>
   )
 }
@@ -307,7 +328,7 @@ export default async function Home() {
             ))}
           </div>
           <div className="space-y-10 lg:pl-16 xl:pl-24">
-            <Newsletter />
+            <Education />
             <Resume />
           </div>
         </div>
