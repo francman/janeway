@@ -1,0 +1,65 @@
+import { ArticleLayout } from '@/components/ArticleLayout';
+import Image from 'next/image';
+import pennyTrickle from './penny_trickle.png';
+
+export const article = {
+  author: 'Frank Manu',
+  date: '2023-11-03',
+  title: 'Penny Trickle | My AWS Cost Reduction',
+  description:
+    'I almost had to reduce my beer budget, but then, I remembered all the talk about AWS Optimization and how AWS is helping customers save cost. I almost had to reduce my beer budget, but then, I remembered all the talk about AWS Optimization and how AWS is helping customers save cost.',
+};
+
+export const metadata = {
+  title: article.title,
+  description: article.description,
+};
+
+export default (props) => <ArticleLayout article={article} {...props} />;
+
+I almost had to reduce my beer budget, but then, I remembered all the news about AWS optimization and how Amazon is helping customers save cost. 
+With a closer look at available options, I was able to reduce my cost of using AWS for webhosting by ~92%.
+
+<Image src={pennyTrickle} alt="" />
+
+The cost of cloud computing can easily add up. A few cents here and there adds up to paying tens, 
+hundreds or even thousands of dollars at scale. In my case I wanted to host a simple portfolio website. 
+Nothing fancy, just some static portfolio website.
+
+## AWS has options
+One of the best things about using AWS is the many available service options and customizability of services.
+In many ways, I think of AWS as the swiss army knife of cloud computing. For web hosting, there is AWS Lightsail, AWS Amplify, 
+S3 and EC2. Depending on the type of website, whether a simple web application, or a complex web application with a lot 
+of dynamic data, one or more of these AWS options will be best suited for the project. Modern websites or web applications
+can be distinctly categorized based on multiple attributes. A good question to start with is, "Is my website static or dynamic?". 
+
+In my case, I have a static website. However, I didn't consider all available options before deploying on AWS. An expensive oversight!
+Let's blame it on my "Just Do It" attitude which on occasion has proven to be a double edged sword. I just did it. I identified the easiest service 
+I understood, AWS EC2, wrapped it up in a secondary service, AWS Elastic Beanstalk and voila there goes my website.
+
+## The Penny Trickle
+My daily cost for hosting a website in a dedicated EC2 instance with Elastic Beanstalk configurations, was $0.71. 
+Hold up... I'm not complaining about $0.71, I'm a frugal engineer but not to that level. Now take $0.71 and multiply by 30 for 
+my monthly cost, that is $21.30. I'm not done yet, multiply that by 12 and you have $255.60. For some context and why I blew a fuse
+after analyzing my AWS yearly cost, this costs more than an Amazon Prime subscription!
+
+$255.60 is equivalent to a year of Netflix Premium subscription. It is more than my Amazon Prime subscription! $255.60 is an excellent meal 
+for 2 on a good date. I can get spotify for 1 year and have some change left. 
+
+Yet, I spent $255.60 each year for 2 years on simple static website that nobody (except me) probably cares about. Adding to the penny trickle, 
+I also had to pay monthly AWS Route 53 cost of $0.50, for the website's domain health checks and ~$13.00 yearly for domain name renewal. In total my yearly cost for 
+hosting my website was $274.60. That is a good number of beers!! Yikes, I forgot about the cost with occasional updates, which adds on $1 or 2 everytime!
+
+## Switching Services -- Hold My Beer
+With the economy this tough, everybody is looking to cut costs. I like having a portfolio website but dammit a man can't just cut beer allowance. 
+I analyzed my cost, listed the features I liked about my current service and went hunting. It didn't take too long to settle on AWS Amplify.
+AWS Amplify has everything I liked,
+1. Auto updates from a Github repo.
+2. Easy integration with AWS Route 53.
+3. Pretty dashboard with health status.
+4. Customizable settings with YAML.
+5. Email notifications on build fails.
+
+The list goes on! The best part is, it costs me pennies for the occasional website updates, and my daily cost for AWS Amplify is ~$0.00. 
+I see the occasional $0.01 every couple of days. Alright here's the gotcha, I know AWS sometimes offers these 12-month free tier which sneaks up like an unwanted subscription. 
+However, from my research so far, my Amplify usage is actually billed that cheap and I am not operating in free tier mode. 
