@@ -7,11 +7,27 @@ import '@/styles/tailwind.css'
 
 export const metadata: Metadata = {
   title: {
-    template: '%s - Frank Kofi Manu',
-    default: 'Frank Kofi Manu',
+    template: '%s - Frank Manu',
+    default: 'Frank Manu',
   },
-  description:
-    "Hi, I’m Frank Kofi Manu. I'm based in Greater Boston. I build complex systems.",
+  description: "Hi, I’m Frank Kofi Manu. I'm based in Boston. I build systems.",
+  keywords: [
+    'Frank Manu',
+    'Boston',
+    'complex systems',
+    'computer engineering',
+    'electrical engineering',
+    'software engineering',
+    'hardware engineering',
+    'systems engineering',
+  ],
+  authors: [{ name: 'Frank Manu' }],
+  openGraph: {
+    title: 'Frank Kofi Manu',
+    description: "Hi, I’m Frank Manu. I'm based in Boston. I build systems.",
+    url: 'https://www.frankmanu.com',
+    type: 'website',
+  },
 }
 
 export default function RootLayout({
