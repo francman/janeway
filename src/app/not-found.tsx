@@ -7,17 +7,17 @@ export default function NotFound() {
     <Container className="flex h-full items-center pt-16 sm:pt-32">
       <div className="flex flex-col items-center">
         <p className="mb-4 text-4xl font-semibold text-zinc-600 dark:text-zinc-300">
-          404
+          404: Unavailable
         </p>
         <Image
           src={image404}
           alt=""
           sizes="(min-width: 1024px) 32rem, 20rem"
-          className="aspect-square rotate-3 rounded-2xl"
+          className="aspect-square rotate-1 rounded-2xl"
         />
-        <h1 className="mt-4 text-4xl font-bold tracking-tight text-zinc-800 dark:text-zinc-100 sm:text-5xl">
+        <h2 className="mt-4 text-4xl font-bold tracking-tight text-zinc-800 dark:text-zinc-100 sm:text-5xl">
           Oops...
-        </h1>
+        </h2>
         <p className="mt-4 text-base text-zinc-600 dark:text-zinc-400">
           Sorry, I couldn’t find the page you’re looking for.
         </p>
