@@ -7,20 +7,20 @@ import logoAnimaginary from '@/images/logos/animaginary.svg'
 import logoCosmos from '@/images/logos/cosmos.svg'
 import logoHelioStream from '@/images/logos/helio-stream.svg'
 import logoOpenShuttle from '@/images/logos/open-shuttle.svg'
-import logoPlanetaria from '@/images/logos/planetaria.svg'
+import logoAnanse from '@/images/logos/ananse.png'
 
 const projects = [
   {
-    name: 'Planetaria',
+    name: 'AnanseNet',
     description:
-      'Creating technology to empower civilians to explore space on their own terms.',
-    link: { href: 'http://planetaria.tech', label: 'planetaria.tech' },
-    logo: logoPlanetaria,
+      'Creating internet service solutions for businesses and neighborhoods in Ghana.',
+    link: { href: 'https://www.anansenet.com', label: 'anansenet.com' },
+    logo: logoAnanse,
   },
   {
-    name: 'Animaginary',
+    name: 'A Monopulse-Phased-Array Radar System',
     description:
-      'High performance web animation library, hand-written in optimized WASM.',
+      'Capstone project for radar system development as platform for ADAR1000 beamforming chip.',
     link: { href: '#', label: 'github.com' },
     logo: logoAnimaginary,
   },
@@ -60,13 +60,13 @@ function LinkIcon(props: React.ComponentPropsWithoutRef<'svg'>) {
 
 export const metadata: Metadata = {
   title: 'Projects',
-  description: 'Things I’ve made trying to put my dent in the universe.',
+  description: 'Making a point, in a world full of dots.',
 }
 
 export default function Projects() {
   return (
     <SimpleLayout
-      title="Things I’ve made trying to put my dent in the universe."
+      title="Making a point, in a world full of dots."
       intro="I’ve worked on tons of little projects over the years but these are the ones that I’m most proud of. Many of them are open-source, so if you see something that piques your interest, check out the code and contribute if you have ideas for how it can be improved."
     >
       <ul
@@ -79,7 +79,7 @@ export default function Projects() {
               <Image
                 src={project.logo}
                 alt=""
-                className="h-8 w-8"
+                className="h-auto w-8"
                 unoptimized
               />
             </div>

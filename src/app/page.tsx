@@ -168,7 +168,7 @@ function Resume() {
   let resume: Array<Role> = [
     {
       company: 'Amazon',
-      title: 'Robotic SysDev Engineer',
+      title: 'Systems Development Engineer',
       logo: logoAmazon,
       start: '2021',
       end: {
@@ -177,7 +177,7 @@ function Resume() {
       },
     },
     {
-      company: 'Carrier [United Technologies Corporation]',
+      company: 'Carrier Corporation [UTC CCS]',
       title: 'Systems Engineer',
       logo: logoCarrier,
       start: '2018',
@@ -203,7 +203,11 @@ function Resume() {
           <Role key={roleIndex} role={role} />
         ))}
       </ol>
-      <Button href="#" variant="secondary" className="group mt-6 w-full">
+      <Button
+        href="https://francman.github.io/resume.pdf"
+        variant="secondary"
+        className="group mt-6 w-full"
+      >
         Download Resume
         <ArrowDownIcon className="h-4 w-4 stroke-zinc-400 transition group-active:stroke-zinc-600 dark:group-hover:stroke-zinc-50 dark:group-active:stroke-zinc-50" />
       </Button>
@@ -322,14 +326,14 @@ export default async function Home() {
       <Photos />
       <Container className="mt-24 md:mt-28">
         <div className="mx-auto grid max-w-xl grid-cols-1 gap-y-20 lg:max-w-none lg:grid-cols-2">
+          <div className="space-y-10 lg:pr-16 xl:pr-24">
+            <Education />
+            <Resume />
+          </div>
           <div className="flex flex-col gap-16">
             {articles.map((article) => (
               <Article key={article.slug} article={article} />
             ))}
-          </div>
-          <div className="space-y-10 lg:pl-16 xl:pl-24">
-            <Education />
-            <Resume />
           </div>
         </div>
       </Container>
