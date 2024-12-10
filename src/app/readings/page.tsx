@@ -6,6 +6,7 @@ import { SimpleLayout } from '@/components/SimpleLayout'
 import imageMeditations from '@/images/photos/meditations-abstract.png'
 import imageShannon from '@/images/photos/shannon-abstract.png'
 import imageAstrophysics from '@/images/photos/astrophysics-abstract.png'
+import imageExpeditionaryForce from '@/images/photos/expeditionary-force.png'
 
 const books = [
   {
@@ -40,6 +41,17 @@ const books = [
       label: 'Audible',
     },
     image: imageAstrophysics,
+  },
+  {
+    name: 'Expeditionary Force',
+    author: 'Craig Alanson, Voice by R.C. Bray',
+    description:
+      'The series follows Bishop, a US soldier sent to space to fight aliens  that invaded Earth. Along the way, he meets Skippy, a "smart" Elder AI, and together they embark on missions to save humanity.',
+    link: {
+      href: 'https://www.audible.com/series/Expeditionary-Force-Audiobooks/B01N9CUGHG',
+      label: 'Audible',
+    },
+    image: imageExpeditionaryForce,
   },
 ]
 
