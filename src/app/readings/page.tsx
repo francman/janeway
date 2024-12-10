@@ -1,49 +1,45 @@
 import { type Metadata } from 'next'
 import Image from 'next/image'
 
-import { Card } from '@/components/Card'
+import { BookCard } from '@/components/BookCard'
 import { SimpleLayout } from '@/components/SimpleLayout'
-import logoAnimaginary from '@/images/logos/animaginary.svg'
-import logoCosmos from '@/images/logos/cosmos.svg'
-import logoHelioStream from '@/images/logos/helio-stream.svg'
-import logoOpenShuttle from '@/images/logos/open-shuttle.svg'
-import logoPlanetaria from '@/images/logos/planetaria.svg'
+import imageMeditations from '@/images/photos/meditations-abstract.png'
+import imageShannon from '@/images/photos/shannon-abstract.png'
+import imageAstrophysics from '@/images/photos/astrophysics-abstract.png'
 
-const projects = [
+const books = [
   {
-    name: 'Planetaria',
+    name: 'A Mathematical Theory of Communication',
+    author: 'C. Shannon',
     description:
-      'Creating technology to empower civilians to explore space on their own terms.',
-    link: { href: 'http://planetaria.tech', label: 'planetaria.tech' },
-    logo: logoPlanetaria,
+      'In this foundational 1948 paper, Claude Shannon made significant contributions to the fied of information theory.',
+    link: {
+      href: 'https://people.math.harvard.edu/~ctm/home/text/others/shannon/entropy/entropy.pdf',
+      label: 'Harvard University',
+    },
+    image: imageShannon,
   },
   {
-    name: 'Animaginary',
+    name: 'Meditations',
+    author: 'Marcus Aurelius',
     description:
-      'High performance web animation library, hand-written in optimized WASM.',
-    link: { href: '#', label: 'github.com' },
-    logo: logoAnimaginary,
+      'A series of personal writings by Marcus Aurelius, Roman Emperor from 161 to 180 AD, recording his private notes to himself and ideas on Stoic philosophy.',
+    link: {
+      href: 'https://www.amazon.com/gp/product/0812968255/ref=ppx_yo_dt_b_search_asin_image?ie=UTF8&psc=1',
+      label: 'Amazon',
+    },
+    image: imageMeditations,
   },
   {
-    name: 'HelioStream',
+    name: 'Astrophysics for People in a Hurry',
+    author: 'Neil deGrasse Tyson',
     description:
-      'Real-time video streaming library, optimized for interstellar transmission.',
-    link: { href: '#', label: 'github.com' },
-    logo: logoHelioStream,
-  },
-  {
-    name: 'cosmOS',
-    description:
-      'The operating system that powers our Planetaria space shuttles.',
-    link: { href: '#', label: 'github.com' },
-    logo: logoCosmos,
-  },
-  {
-    name: 'OpenShuttle',
-    description:
-      'The schematics for the first rocket I designed that successfully made it to orbit.',
-    link: { href: '#', label: 'github.com' },
-    logo: logoOpenShuttle,
+      "What is the nature of space and time? There's no better guide through these mind-expanding questions than Neil.",
+    link: {
+      href: 'https://www.audible.com/pd/Astrophysics-for-People-in-a-Hurry-Audiobook/B06X9MXN32?eac_link=3hch9jVt0KuC&ref=web_search_eac_asin_1&eac_selected_type=asin&eac_selected=B06X9MXN32&qid=RAO7R3kBRY&eac_id=137-6904447-0676318_RAO7R3kBRY&sr=1-1',
+      label: 'Audible',
+    },
+    image: imageAstrophysics,
   },
 ]
 
@@ -66,32 +62,29 @@ export const metadata: Metadata = {
 export default function Projects() {
   return (
     <SimpleLayout
-      title="If I can see farther than others, it is because I stand on the shoulders of giants."
-      intro="I’ve worked on tons of little projects over the years but these are the ones that I’m most proud of. Many of them are open-source, so if you see something that piques your interest, check out the code and contribute if you have ideas for how it can be improved."
+      title="If I can see farther than others, it is because I stand on the shoulders of giants..."
+      intro="Books, audiobooks, movies, and shows ignite my imagination. From the Expeditionary Force series to thought-provoking research papers, each story and idea opens new worlds of possibilities. Here are some of my favorites."
     >
       <ul
         role="list"
-        className="grid grid-cols-1 gap-x-12 gap-y-16 sm:grid-cols-2 lg:grid-cols-3"
+        className="grid grid-cols-1 gap-x-12 gap-y-16 sm:grid-cols-2 lg:grid-cols-4"
       >
-        {projects.map((project) => (
-          <Card as="li" key={project.name}>
-            <div className="relative z-10 flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-md shadow-zinc-800/5 ring-1 ring-zinc-900/5 dark:border dark:border-zinc-700/50 dark:bg-zinc-800 dark:ring-0">
-              <Image
-                src={project.logo}
-                alt=""
-                className="h-8 w-8"
-                unoptimized
-              />
+        {books.map((book) => (
+          <BookCard as="li" key={book.name}>
+            <div className="z-10 flex h-28 w-full items-center justify-center rounded-md bg-white shadow-md shadow-zinc-800/5 ring-1 ring-zinc-900/5 dark:bg-zinc-800 dark:ring-0">
+              <Image src={book.image} alt="" className="rounded-md" />
             </div>
             <h2 className="mt-6 text-base font-semibold text-zinc-800 dark:text-zinc-100">
-              <Card.Link href={project.link.href}>{project.name}</Card.Link>
+              <BookCard.Link href={book.link.href}>
+                {book.name} - <span className="italic">{book.author}</span>
+              </BookCard.Link>
             </h2>
-            <Card.Description>{project.description}</Card.Description>
+            <BookCard.Description>{book.description}</BookCard.Description>
             <p className="relative z-10 mt-6 flex text-sm font-medium text-zinc-400 transition group-hover:text-teal-500 dark:text-zinc-200">
               <LinkIcon className="h-6 w-6 flex-none" />
-              <span className="ml-2">{project.link.label}</span>
+              <span className="ml-2">{book.link.label}</span>
             </p>
-          </Card>
+          </BookCard>
         ))}
       </ul>
     </SimpleLayout>

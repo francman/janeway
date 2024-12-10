@@ -47,30 +47,30 @@ export default function Uses() {
     >
       <div className="space-y-20">
         <ToolsSection title="Workstation">
-          <Tool title="16” MacBook Pro, M1 Max, 64GB RAM (2021)">
-            I was using an Intel-based 16” MacBook Pro prior to this and the
-            difference is night and day. I’ve never heard the fans turn on a
-            single time, even under the incredibly heavy loads I put it through
-            with our various launch simulations.
+          <Tool title="Sona - 16” MacBook Pro, 2020, 1TB Storage">
+            This is my sidekick. I carry it everywhere I go. If I'm in a bind
+            and need quick compute or if I need to watch a movie or doom scroll
+            social media, I summon Sona. I've replaced the screen once after an
+            unfortunate battle with gravity. Gravity won.
           </Tool>
-          <Tool title="Apple Pro Display XDR (Standard Glass)">
-            The only display on the market if you want something HiDPI and
-            bigger than 27”. When you’re working at planetary scale, every pixel
-            you can get counts.
+          <Tool title="Warlock - Custom built L-CLASS from OriginPC">
+            This is my main workstation. I built it to be a powerhouse for
+            gaming, coding, and YouTube videos. It has a 13th Gen Intel Core i9.
+            64GB of RAM, an NVIDIA GeForce RTX 3080 Ti. I’ve been using it since
+            November 2022. It’s still a beast.
           </Tool>
-          <Tool title="IBM Model M SSK Industrial Keyboard">
-            They don’t make keyboards the way they used to. I buy these any time
-            I see them go up for sale and keep them in storage in case I need
-            parts or need to retire my main.
+          <Tool title="Keychron Q6 Mechanical Keyboard">
+            I don't think I can go back to a "normal" keyboard for gaming. The
+            Q6 is a great keyboard for gaming and typing. I love the feel of the
+            keys and the sound of the banana switches. I use it wired because I
+            don't trust wireless for gaming.
           </Tool>
-          <Tool title="Apple Magic Trackpad">
-            Something about all the gestures makes me feel like a wizard with
-            special powers. I really like feeling like a wizard with special
-            powers.
-          </Tool>
-          <Tool title="Herman Miller Aeron Chair">
-            If I’m going to slouch in the worst ergonomic position imaginable
-            all day, I might as well do it in an expensive chair.
+          <Tool title="MX Master 3 Mouse">
+            I have a love-hate relationship with this mouse. I hate that I have
+            4 of them. It costs a pretty penny. I just love the design,
+            functionality and ergonomics of this mouse. I always carry one in my
+            backpack and when I don't have it, I feel slowed down. I have one
+            dedicated for Warlock and at least one more in a drawer somewhere.
           </Tool>
         </ToolsSection>
         <ToolsSection title="Development tools">
@@ -81,38 +81,33 @@ export default function Uses() {
             appreciate the varying color themes that help reduce eye strain for
             me.
           </Tool>
+
           <Tool title="Drawio">
-            I like visualizing things. Whenever I can put forth a visual
-            representation of a project I am working on, it helps me move
-            faster. Now, that is why I use drawio, a lot.
+            I feel the need to call out Drawio. I like visualizing things and
+            writing down ideas, I communicated best that way. Whenever I can put
+            forth a visual representation of a project I am working on, it helps
+            me move faster. Now, that is why I use drawio, a lot.
           </Tool>
         </ToolsSection>
         <ToolsSection title="Design">
           <Tool title="Adobe Creative Cloud">
-            We started using Figma as just a design tool but now it’s become our
-            virtual whiteboard for the entire company. Never would have expected
-            the collaboration features to be the real hook.
+            Yup, I pay for the full suite. I use Photoshop, Illustrator, and
+            everything. I hate it but also feels like I can't live without it.
+            I've tried to use other tools but I always come back to Adobe. Yes,
+            I have also cancelled and re-activated my subscription a few times.
           </Tool>
         </ToolsSection>
-        <ToolsSection title="Productivity">
-          <Tool title="Alfred">
-            It’s not the newest kid on the block but it’s still the fastest. The
-            Sublime Text of the application launcher world.
+        <ToolsSection title="AI Tools">
+          <Tool title="ChatGPT">
+            I find myself using it for search, sometimes in place of Google. It
+            defifnitely beats Stack Overflow when I need to find a solution to a
+            problem or need to understand a piece of code very quickly. I like
+            that I can query follow up questions.
           </Tool>
-          <Tool title="Reflect">
-            Using a daily notes system instead of trying to keep things
-            organized by topics has been super powerful for me. And with
-            Reflect, it’s still easy for me to keep all of that stuff
-            discoverable by topic even though all of my writing happens in the
-            daily note.
-          </Tool>
-          <Tool title="SavvyCal">
-            Great tool for scheduling meetings while protecting my calendar and
-            making sure I still have lots of time for deep work during the week.
-          </Tool>
-          <Tool title="Focus">
-            Simple tool for blocking distracting websites when I need to just do
-            the work and get some momentum going.
+          <Tool title="Midjourney AI">
+            Generating images for my side projects has never been easier.
+            Midjourney just gets the job done. Yup, occasionally, it generates a
+            Charlie Foxtrot that is just mind warping!! ***shudders***
           </Tool>
         </ToolsSection>
       </div>
