@@ -46,9 +46,7 @@ export default async function ArticlesIndex() {
   return (
     <SimpleLayout
       title="Cogito, ergo sum ... I think therefore I am."
-      intro="I love engineering. Here are some of my thoughts and positions on system design, 
-              hardware & software development, leadership, product design, 
-              and other topics."
+      intro="I love engineering. Here are some of my thoughts and positions on system design, hardware & software development, leadership, product design, and other topics."
     >
       <div className="md:border-l md:border-zinc-100 md:pl-6 md:dark:border-zinc-700/40">
         <div className="flex max-w-3xl flex-col space-y-16">
