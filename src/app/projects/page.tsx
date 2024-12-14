@@ -17,7 +17,7 @@ const projects = [
   {
     name: 'NSBE Boston Scholarships',
     description:
-      "In 2018, as Collegiate Chair of  NSBE Boston, I formed NSBE Boston's first Scholarship Board and developed a uniform application, to objectively review and award scholarships. With this process, NSBE Boston has awarded over $0.30M in scholarships over 5 years.",
+      "In 2019, as Collegiate Chair of  NSBE Boston, I developed NSBE Boston's standard scholarship application and formed the first Scholarship Board, to objectively review and award scholarships. With this process, NSBE Boston awarded $0.12M in my tenure and over $0.30M in scholarships since 2018. The bar for my successors has remained as fierce advocates for students' success in engineering and sciences.",
     link: {
       href: 'https://www.nsbeboston.org/scholarships',
       label: 'nsbeboston.org',
