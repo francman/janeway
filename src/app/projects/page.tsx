@@ -3,11 +3,8 @@ import Image from 'next/image'
 
 import { Card } from '@/components/Card'
 import { SimpleLayout } from '@/components/SimpleLayout'
-import logoAnimaginary from '@/images/logos/animaginary.svg'
-import logoCosmos from '@/images/logos/cosmos.svg'
-import logoHelioStream from '@/images/logos/helio-stream.svg'
-import logoOpenShuttle from '@/images/logos/open-shuttle.svg'
 import logoAnanse from '@/images/logos/ananse.png'
+import logoNSBE from '@/images/logos/nsbe.png'
 
 const projects = [
   {
@@ -16,6 +13,16 @@ const projects = [
       'Creating internet service solutions for businesses and neighborhoods in Ghana.',
     link: { href: 'https://www.anansenet.com', label: 'anansenet.com' },
     logo: logoAnanse,
+  },
+  {
+    name: 'NSBE Boston Scholarships',
+    description:
+      "In 2018, as Collegiate Chair of  NSBE Boston, I formed NSBE Boston's first Scholarship Board and developed a uniform application, to objectively review and award scholarships. With this process, NSBE Boston has awarded over $0.30M in scholarships over 5 years.",
+    link: {
+      href: 'https://www.nsbeboston.org/scholarships',
+      label: 'nsbeboston.org',
+    },
+    logo: logoNSBE,
   },
 ]
 

@@ -8,8 +8,7 @@ import imageShannon from '@/images/photos/shannon-abstract.png'
 import imageAstrophysics from '@/images/photos/astrophysics-abstract.png'
 import imageExpeditionaryForce from '@/images/photos/expeditionary-force.png'
 import imageProjectHailMary from '@/images/photos/project-hail-mary.png'
-import { link } from 'fs'
-
+import imageSapiens from '@/images/photos/sapiens.png'
 const books = [
   {
     name: 'A Mathematical Theory of Communication',
@@ -65,6 +64,17 @@ const books = [
       label: 'Amazon',
     },
     image: imageProjectHailMary,
+  },
+  {
+    name: 'Sapiens: A Brief History of Humankind',
+    author: 'Yuval Noah Harari',
+    description:
+      "Sapiens is eye-opening and thought-provoking. The audiobook is also well narrated and definitely drew me in. Definitely a recommended for anyone interested in understanding humanity's context in history.",
+    link: {
+      href: 'https://www.audible.com/pd/Sapiens-Audiobook/B0741G911Q?source_code=ASSGB149080119000H&share_location=pdp',
+      label: 'Audible',
+    },
+    image: imageSapiens,
   },
 ]
 
