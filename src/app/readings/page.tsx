@@ -7,6 +7,8 @@ import imageMeditations from '@/images/photos/meditations-abstract.png'
 import imageShannon from '@/images/photos/shannon-abstract.png'
 import imageAstrophysics from '@/images/photos/astrophysics-abstract.png'
 import imageExpeditionaryForce from '@/images/photos/expeditionary-force.png'
+import imageProjectHailMary from '@/images/photos/project-hail-mary.png'
+import { link } from 'fs'
 
 const books = [
   {
@@ -52,6 +54,17 @@ const books = [
       label: 'Audible',
     },
     image: imageExpeditionaryForce,
+  },
+  {
+    name: 'Project Hail Mary',
+    author: 'Andy Weir',
+    description:
+      'A lone astronaut must save the earth from disaster in this incredible new science-based thriller. Without too many spoilers, the story is a must-read for sci-fi lovers.',
+    link: {
+      href: 'https://www.amazon.com/Project-Hail-Mary-Andy-Weir/dp/0593135202',
+      label: 'Amazon',
+    },
+    image: imageProjectHailMary,
   },
 ]
 
