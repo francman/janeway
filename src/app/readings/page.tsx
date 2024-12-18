@@ -9,6 +9,7 @@ import imageAstrophysics from '@/images/photos/astrophysics-abstract.png'
 import imageExpeditionaryForce from '@/images/photos/expeditionary-force.png'
 import imageProjectHailMary from '@/images/photos/project-hail-mary.png'
 import imageSapiens from '@/images/photos/sapiens.png'
+import imageHalfLifeOfMarieCurie from '@/images/photos/marie-curie.png'
 const books = [
   {
     name: 'A Mathematical Theory of Communication',
@@ -75,6 +76,17 @@ const books = [
       label: 'Audible',
     },
     image: imageSapiens,
+  },
+  {
+    name: 'The Half-Life of Marie Curie',
+    author: 'Lauren Gunderson',
+    description:
+      'The Half-Life of Marie Curie is a play about the friendship between Marie Curie and Hertha Ayrton, a brilliant British suffragette and inventor. The play is a great way to learn about the lives of these two amazing women who defied norms and made significant contributions to science.',
+    link: {
+      href: 'https://www.audible.com/pd/The-Half-Life-of-Marie-Curie-Audiobook/B07ZWP5WF6?source_code=ASSGB149080119000H&share_location=pdp',
+      label: 'Audible',
+    },
+    image: imageHalfLifeOfMarieCurie,
   },
 ]
 
