@@ -10,6 +10,8 @@ import imageExpeditionaryForce from '@/images/photos/expeditionary-force.png'
 import imageProjectHailMary from '@/images/photos/project-hail-mary.png'
 import imageSapiens from '@/images/photos/sapiens.png'
 import imageHalfLifeOfMarieCurie from '@/images/photos/marie-curie.png'
+import imageNexus from '@/images/photos/creation-of-adam.png'
+
 const books = [
   {
     name: 'A Mathematical Theory of Communication',
@@ -39,7 +41,7 @@ const books = [
     description:
       "What is the nature of space and time? There's no better guide through these mind-expanding questions than Neil.",
     link: {
-      href: 'https://www.audible.com/pd/Astrophysics-for-People-in-a-Hurry-Audiobook/B06X9MXN32?eac_link=3hch9jVt0KuC&ref=web_search_eac_asin_1&eac_selected_type=asin&eac_selected=B06X9MXN32&qid=RAO7R3kBRY&eac_id=137-6904447-0676318_RAO7R3kBRY&sr=1-1',
+      href: "https://www.audible.com/pd/Astrophysics-for-People-in-a-Hurry-Audiobook/B06X9MXN32?source_code=ASSGB149080119000H&share_location=pdp",
       label: 'Audible',
     },
     image: imageAstrophysics,
@@ -88,9 +90,16 @@ const books = [
     },
     image: imageHalfLifeOfMarieCurie,
   },
+  {
+    name: "Nexus", 
+    author:"Yuval Noah Harari", 
+    description: "Nexus explores the relationship between humanity and information. I would argue,  Information Technology. Just as expected, Yuval Noah Harari didn't disappoint, masterfully weaving a thought-provoking story, exploring the future with information from the past.", 
+    link: {href: "https://www.audible.com/pd/Nexus-Audiobook/B0811111111?source_code=ASSGB149080119000H&share_location=pdp", label: "Audible"}, image: imageNexus
+  },
 ]
 
 function LinkIcon(props: React.ComponentPropsWithoutRef<'svg'>) {
+  
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true" {...props}>
       <path
