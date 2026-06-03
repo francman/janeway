@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useEffect, useRef } from 'react'
+import { createContext, useEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { ThemeProvider, useTheme } from 'next-themes'
 import posthog from 'posthog-js'
@@ -11,16 +11,45 @@ const PostHogPageView = dynamic(() => import('./PostHogPageView'), {
   ssr: false,
 })
 
+const posthogKey = process.env.NEXT_PUBLIC_POSTHOG_KEY
+const posthogHost = process.env.NEXT_PUBLIC_POSTHOG_HOST
+
 export function PHProvider({ children }: { children: React.ReactNode }) {
+  let [isReady, setIsReady] = useState(false)
+
   useEffect(() => {
-    posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
-      api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST,
-      person_profiles: 'identified_only',
-      capture_pageview: false,
-      capture_pageleave: true, // Enable pageleave capture
-    })
+    if (!posthogKey) {
+      return
+    }
+
+    if (posthog.__loaded) {
+      setIsReady(true)
+      return
+    }
+
+    try {
+      posthog.init(posthogKey, {
+        api_host: posthogHost,
+        person_profiles: 'identified_only',
+        capture_pageview: false,
+        capture_pageleave: true,
+      })
+      setIsReady(true)
+    } catch (error) {
+      console.warn('PostHog failed to initialize', error)
+    }
   }, [])
-  return <PostHogProvider client={posthog}>{children}</PostHogProvider>
+
+  if (!posthogKey || !isReady) {
+    return <>{children}</>
+  }
+
+  return (
+    <PostHogProvider client={posthog}>
+      <PostHogPageView />
+      {children}
+    </PostHogProvider>
+  )
 }
 
 function usePrevious<T>(value: T) {
@@ -68,7 +97,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <ThemeProvider attribute="class" disableTransitionOnChange>
         <PHProvider>
           <ThemeWatcher />
-          <PostHogPageView />
           {children}
         </PHProvider>
       </ThemeProvider>
