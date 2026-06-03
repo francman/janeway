@@ -1,42 +1,70 @@
-# Spotlight
+# Frank Manu
 
-Spotlight is a [Tailwind UI](https://tailwindui.com) site template built using [Tailwind CSS](https://tailwindcss.com) and [Next.js](https://nextjs.org).
+Personal website for Frank Manu, built with Next.js, MDX, Tailwind CSS, and the
+Tailwind UI Spotlight template.
 
-## Getting started
+## Setup
 
-To get started with this template, first install the npm dependencies:
+Install dependencies:
 
 ```bash
 npm install
 ```
 
-Next, create a `.env.local` file in the root of your project and set the `NEXT_PUBLIC_SITE_URL` variable to your site's public URL:
+Create a local environment file from the example:
 
-```
-NEXT_PUBLIC_SITE_URL=https://example.com
+```bash
+cp .env.example .env.local
 ```
 
-Next, run the development server:
+PostHog analytics is optional. Leave `NEXT_PUBLIC_POSTHOG_KEY` blank to run the
+site without analytics.
+
+## Scripts
+
+Run the development server:
 
 ```bash
 npm run dev
 ```
 
-Finally, open [http://localhost:3000](http://localhost:3000) in your browser to view the website.
+Build for production:
 
-## Customizing
+```bash
+npm run build
+```
 
-You can start editing this template by modifying the files in the `/src` folder. The site will auto-update as you edit these files.
+Run lint checks:
 
-## License
+```bash
+npm run lint
+```
 
-This site template is a commercial product and is licensed under the [Tailwind UI license](https://tailwindui.com/license).
+## Content
 
-## Learn more
+Most site content lives under `src/app`:
 
-To learn more about the technologies used in this site template, see the following resources:
+- `src/app/page.tsx`: homepage, work history, education, and recent writings.
+- `src/app/about/page.tsx`: about page.
+- `src/app/projects/page.tsx`: project cards.
+- `src/app/readings/page.tsx`: books, audiobooks, papers, movies, and shows.
+- `src/app/lab233/page.tsx`: tools and home lab notes.
+- `src/app/writings/*/page.mdx`: MDX articles.
 
-- [Tailwind CSS](https://tailwindcss.com/docs) - the official Tailwind CSS documentation
-- [Next.js](https://nextjs.org/docs) - the official Next.js documentation
-- [Headless UI](https://headlessui.dev) - the official Headless UI documentation
-- [MDX](https://mdxjs.com) - the MDX documentation
+Static images and logos live under `src/images`.
+
+## Environment Variables
+
+```env
+NEXT_PUBLIC_POSTHOG_KEY=
+NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
+```
+
+These values are public browser environment variables. Do not put private
+server-side secrets in variables prefixed with `NEXT_PUBLIC_`.
+
+## Notes
+
+The app is static-first and currently has no backend. Keep third-party account
+credentials out of the deployed app; use local scripts or data exports for
+content automation.
