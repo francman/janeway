@@ -18,12 +18,27 @@ export interface ArticleWithSlug extends Article {
   slug: string
 }
 
+const PUBLISHED = 'PUBLISHED'
+
 const region = process.env.AWS_REGION ?? 'us-east-1'
-const tableName = process.env.ARTICLES_TABLE ?? ''
-const bucketName = process.env.ARTICLES_BUCKET ?? ''
+const tableName = process.env.ARTICLES_TABLE
+const bucketName = process.env.ARTICLES_BUCKET
 
 const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({ region }))
 const s3 = new S3Client({ region })
+
+let warnedTable = false
+let warnedBucket = false
+function warnMissingTable() {
+  if (warnedTable) return
+  warnedTable = true
+  console.warn('[articles] ARTICLES_TABLE env var unset; returning empty results')
+}
+function warnMissingBucket() {
+  if (warnedBucket) return
+  warnedBucket = true
+  console.warn('[articles] ARTICLES_BUCKET env var unset; returning null bodies')
+}
 
 function rowToArticle(row: Record<string, unknown>): ArticleWithSlug {
   return {
@@ -31,12 +46,15 @@ function rowToArticle(row: Record<string, unknown>): ArticleWithSlug {
     title: row.title as string,
     description: row.description as string,
     author: row.author as string,
-    date: (row.publishedAt as string) ?? (row.date as string),
+    date: row.publishedAt as string,
   }
 }
 
 async function fetchPublishedArticles(): Promise<ArticleWithSlug[]> {
-  if (!tableName) return []
+  if (!tableName) {
+    warnMissingTable()
+    return []
+  }
 
   const res = await ddb.send(
     new QueryCommand({
@@ -44,7 +62,7 @@ async function fetchPublishedArticles(): Promise<ArticleWithSlug[]> {
       IndexName: 'byStatus',
       KeyConditionExpression: '#s = :s',
       ExpressionAttributeNames: { '#s': 'status' },
-      ExpressionAttributeValues: { ':s': 'PUBLISHED' },
+      ExpressionAttributeValues: { ':s': PUBLISHED },
       ScanIndexForward: false,
     }),
   )
@@ -55,7 +73,10 @@ async function fetchPublishedArticles(): Promise<ArticleWithSlug[]> {
 async function fetchArticleBySlug(
   slug: string,
 ): Promise<ArticleWithSlug | null> {
-  if (!tableName) return null
+  if (!tableName) {
+    warnMissingTable()
+    return null
+  }
 
   const res = await ddb.send(
     new GetCommand({
@@ -64,22 +85,34 @@ async function fetchArticleBySlug(
     }),
   )
 
-  if (!res.Item) return null
+  if (!res.Item || res.Item.status !== PUBLISHED) return null
   return rowToArticle(res.Item)
 }
 
 async function fetchArticleMdx(slug: string): Promise<string | null> {
-  if (!bucketName) return null
+  if (!bucketName) {
+    warnMissingBucket()
+    return null
+  }
 
-  const res = await s3.send(
-    new GetObjectCommand({
-      Bucket: bucketName,
-      Key: `articles/${slug}/page.mdx`,
-    }),
-  )
-
-  const body = await res.Body?.transformToString()
-  return body ?? null
+  try {
+    const res = await s3.send(
+      new GetObjectCommand({
+        Bucket: bucketName,
+        Key: `articles/${slug}/page.mdx`,
+      }),
+    )
+    const body = await res.Body?.transformToString()
+    return body ?? null
+  } catch (err) {
+    if (
+      err instanceof Error &&
+      (err.name === 'NoSuchKey' || err.name === 'NotFound')
+    ) {
+      return null
+    }
+    throw err
+  }
 }
 
 export const getPublishedArticles = unstable_cache(
@@ -101,7 +134,3 @@ export const getArticleMdx = (slug: string) =>
     ['articles:mdx', slug],
     { tags: [`article:${slug}`], revalidate: 300 },
   )()
-
-export async function getAllArticles(): Promise<ArticleWithSlug[]> {
-  return getPublishedArticles()
-}
