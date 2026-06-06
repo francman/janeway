@@ -1,0 +1,27 @@
+{
+  "name": "janeway-cdk",
+  "version": "0.1.0",
+  "private": true,
+  "bin": {
+    "janeway-cdk": "bin/janeway.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "synth": "cdk synth",
+    "deploy": "cdk deploy",
+    "diff": "cdk diff",
+    "destroy": "cdk destroy"
+  },
+  "devDependencies": {
+    "@types/node": "20.4.7",
+    "aws-cdk": "^2.166.0",
+    "ts-node": "^10.9.2",
+    "typescript": "5.1.6"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.166.0",
+    "constructs": "^10.3.0",
+    "source-map-support": "^0.5.21"
+  }
+}
