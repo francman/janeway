@@ -53,7 +53,7 @@ export function PHProvider({ children }: { children: React.ReactNode }) {
 }
 
 function usePrevious<T>(value: T) {
-  let ref = useRef<T>()
+  let ref = useRef<T | undefined>(undefined)
 
   useEffect(() => {
     ref.current = value
