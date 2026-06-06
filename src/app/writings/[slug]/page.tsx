@@ -1,12 +1,11 @@
 import { type Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { MDXRemote } from 'next-mdx-remote/rsc'
-import rehypePrism from '@mapbox/rehype-prism'
-import remarkGfm from 'remark-gfm'
 
 import { ArticleLayout } from '@/components/ArticleLayoutRSC'
 import { getArticleBySlug, getArticleMdx } from '@/lib/articles'
 import { mdxComponents } from '@/components/mdx'
+import { mdxOptions } from '@/lib/mdx-options'
 
 interface PageProps {
   params: Promise<{ slug: string }>
@@ -38,12 +37,7 @@ export default async function ArticlePage({ params }: PageProps) {
       <MDXRemote
         source={body}
         components={mdxComponents(slug)}
-        options={{
-          mdxOptions: {
-            remarkPlugins: [remarkGfm as never],
-            rehypePlugins: [rehypePrism as never],
-          },
-        }}
+        options={{ mdxOptions }}
       />
     </ArticleLayout>
   )
