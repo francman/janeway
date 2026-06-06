@@ -45,36 +45,43 @@ fi
 SLUG="$(basename "$DIR")"
 NOW="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
-# Parse frontmatter via gray-matter (already in node_modules).
-# Normalizes Date objects (YAML auto-parses YYYY-MM-DD) back to YYYY-MM-DD strings.
-META_JSON="$(MDX_PATH="$MDX_PATH" node -e '
+# One node call: parse frontmatter, validate required fields, emit shell-safe
+# exports (TITLE/DESCRIPTION/AUTHOR/DATE/STATUS) and the DynamoDB ITEM_JSON.
+eval "$(SLUG="$SLUG" NOW="$NOW" MDX_PATH="$MDX_PATH" node -e '
   const fs = require("fs");
   const matter = require("gray-matter");
-  const file = matter(fs.readFileSync(process.env.MDX_PATH, "utf8"));
+  const { data } = matter(fs.readFileSync(process.env.MDX_PATH, "utf8"));
   const norm = (v) => v instanceof Date ? v.toISOString().slice(0, 10) : v;
-  const data = Object.fromEntries(Object.entries(file.data).map(([k, v]) => [k, norm(v)]));
-  process.stdout.write(JSON.stringify(data));
+  const get = (k) => {
+    const v = norm(data[k]);
+    return v == null ? "" : (typeof v === "string" ? v : JSON.stringify(v));
+  };
+  const required = ["title", "description", "author", "date"];
+  for (const k of required) {
+    if (!get(k)) {
+      process.stderr.write(`frontmatter missing required field: ${k}\n`);
+      process.exit(1);
+    }
+  }
+  const status = get("status") || "PUBLISHED";
+  const item = {
+    slug: { S: process.env.SLUG },
+    title: { S: get("title") },
+    description: { S: get("description") },
+    author: { S: get("author") },
+    publishedAt: { S: get("date") },
+    updatedAt: { S: process.env.NOW },
+    status: { S: status },
+    s3Key: { S: `articles/${process.env.SLUG}/page.mdx` },
+  };
+  const shellEscape = (s) => `'\''${String(s).replace(/'\''/g, `'\''\\'\'\''\''`)}'\''`;
+  process.stdout.write(`TITLE=${shellEscape(get("title"))}\n`);
+  process.stdout.write(`DESCRIPTION=${shellEscape(get("description"))}\n`);
+  process.stdout.write(`AUTHOR=${shellEscape(get("author"))}\n`);
+  process.stdout.write(`DATE=${shellEscape(get("date"))}\n`);
+  process.stdout.write(`STATUS=${shellEscape(status)}\n`);
+  process.stdout.write(`ITEM_JSON=${shellEscape(JSON.stringify(item))}\n`);
 ')"
-
-read_field() {
-  node -e '
-    const data = JSON.parse(process.argv[1]);
-    const v = data[process.argv[2]];
-    process.stdout.write(v == null ? "" : (typeof v === "string" ? v : JSON.stringify(v)));
-  ' "$META_JSON" "$1"
-}
-
-TITLE="$(read_field title)"
-DESCRIPTION="$(read_field description)"
-AUTHOR="$(read_field author)"
-DATE="$(read_field date)"
-STATUS="$(read_field status)"
-[[ -z "$STATUS" ]] && STATUS="PUBLISHED"
-
-if [[ -z "$TITLE" || -z "$DESCRIPTION" || -z "$AUTHOR" || -z "$DATE" ]]; then
-  echo "frontmatter missing required fields (title, description, author, date)" >&2
-  exit 1
-fi
 
 echo ">> syncing $DIR -> s3://$ARTICLES_BUCKET/articles/$SLUG/"
 aws s3 sync "$DIR" "s3://$ARTICLES_BUCKET/articles/$SLUG/" \
@@ -83,30 +90,19 @@ aws s3 sync "$DIR" "s3://$ARTICLES_BUCKET/articles/$SLUG/" \
   --exclude ".*"
 
 echo ">> updating DynamoDB item slug=$SLUG status=$STATUS"
-ITEM_JSON="$(SLUG="$SLUG" TITLE="$TITLE" DESCRIPTION="$DESCRIPTION" AUTHOR="$AUTHOR" \
-  DATE="$DATE" NOW="$NOW" STATUS="$STATUS" node -e '
-  const env = process.env;
-  const item = {
-    slug: { S: env.SLUG },
-    title: { S: env.TITLE },
-    description: { S: env.DESCRIPTION },
-    author: { S: env.AUTHOR },
-    publishedAt: { S: env.DATE },
-    updatedAt: { S: env.NOW },
-    status: { S: env.STATUS },
-    s3Key: { S: `articles/${env.SLUG}/page.mdx` },
-  };
-  process.stdout.write(JSON.stringify(item));
-')"
-
 aws dynamodb put-item \
   --table-name "$ARTICLES_TABLE" \
   --region "$AWS_REGION" \
   --item "$ITEM_JSON" >/dev/null
 
 if [[ -n "${SITE_URL:-}" && -n "${REVALIDATE_SECRET:-}" ]]; then
+  # URL-encode secret + slug before assembling the curl URL.
+  ENCODED="$(SECRET="$REVALIDATE_SECRET" SLUG="$SLUG" node -e '
+    const enc = encodeURIComponent;
+    process.stdout.write(`?secret=${enc(process.env.SECRET)}&slug=${enc(process.env.SLUG)}`);
+  ')"
   echo ">> revalidating $SITE_URL"
-  curl -fsS -X POST "$SITE_URL/api/revalidate?secret=$REVALIDATE_SECRET&slug=$SLUG" >/dev/null || \
+  curl -fsS -X POST "$SITE_URL/api/revalidate$ENCODED" >/dev/null || \
     echo "   revalidate ping failed (non-fatal)"
 fi
 
