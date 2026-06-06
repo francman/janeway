@@ -46,11 +46,14 @@ SLUG="$(basename "$DIR")"
 NOW="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
 # Parse frontmatter via gray-matter (already in node_modules).
+# Normalizes Date objects (YAML auto-parses YYYY-MM-DD) back to YYYY-MM-DD strings.
 META_JSON="$(MDX_PATH="$MDX_PATH" node -e '
   const fs = require("fs");
   const matter = require("gray-matter");
   const file = matter(fs.readFileSync(process.env.MDX_PATH, "utf8"));
-  process.stdout.write(JSON.stringify(file.data));
+  const norm = (v) => v instanceof Date ? v.toISOString().slice(0, 10) : v;
+  const data = Object.fromEntries(Object.entries(file.data).map(([k, v]) => [k, norm(v)]));
+  process.stdout.write(JSON.stringify(data));
 ')"
 
 read_field() {
