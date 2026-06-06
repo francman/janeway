@@ -12,13 +12,15 @@ set -euo pipefail
 #   description: ...
 #   author: ...
 #   date: 2026-01-15
-#   tags: [aws, cost]   # optional
-#   coverImage: cover.png   # optional
+#   status: PUBLISHED    # optional, defaults to PUBLISHED
+#   tags: [aws, cost]    # optional
+#   coverImage: cover.png  # optional
 #   ---
 #
-# Required env vars (sourced from .env.local by default):
-#   ARTICLES_BUCKET, ARTICLES_TABLE, AWS_REGION
-#   SITE_URL (e.g. https://frankmanu.com) and REVALIDATE_SECRET — optional, enables cache bust
+# Env vars (sourced from .env.local if present):
+#   ARTICLES_BUCKET, ARTICLES_TABLE, AWS_REGION   required
+#   AWS_PROFILE                                    optional, for SSO
+#   SITE_URL + REVALIDATE_SECRET                   optional, enables cache bust
 
 DIR="${1:-}"
 if [[ -z "$DIR" || ! -d "$DIR" ]]; then
@@ -41,33 +43,29 @@ if [[ ! -f "$MDX_PATH" ]]; then
 fi
 
 SLUG="$(basename "$DIR")"
-NOW="$(python3 -c 'import datetime; print(datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"))')"
+NOW="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
-# Extract YAML frontmatter using python (avoids extra deps).
-read_frontmatter() {
-  python3 - "$MDX_PATH" <<'PY'
-import json, re, sys, yaml
-path = sys.argv[1]
-text = open(path, 'r', encoding='utf-8').read()
-m = re.match(r"^---\r?\n(.*?)\r?\n---\r?\n", text, flags=re.DOTALL)
-if not m:
-    print(json.dumps({}))
-    sys.exit(0)
-print(json.dumps(yaml.safe_load(m.group(1)) or {}))
-PY
+# Parse frontmatter via gray-matter (already in node_modules).
+META_JSON="$(MDX_PATH="$MDX_PATH" node -e '
+  const fs = require("fs");
+  const matter = require("gray-matter");
+  const file = matter(fs.readFileSync(process.env.MDX_PATH, "utf8"));
+  process.stdout.write(JSON.stringify(file.data));
+')"
+
+read_field() {
+  node -e '
+    const data = JSON.parse(process.argv[1]);
+    const v = data[process.argv[2]];
+    process.stdout.write(v == null ? "" : (typeof v === "string" ? v : JSON.stringify(v)));
+  ' "$META_JSON" "$1"
 }
 
-META_JSON="$(read_frontmatter)"
-
-get() {
-  python3 -c "import json,sys; d=json.loads(sys.argv[1]); v=d.get(sys.argv[2]); print('' if v is None else v if isinstance(v,str) else json.dumps(v))" "$META_JSON" "$1"
-}
-
-TITLE="$(get title)"
-DESCRIPTION="$(get description)"
-AUTHOR="$(get author)"
-DATE="$(get date)"
-STATUS="$(get status)"
+TITLE="$(read_field title)"
+DESCRIPTION="$(read_field description)"
+AUTHOR="$(read_field author)"
+DATE="$(read_field date)"
+STATUS="$(read_field status)"
 [[ -z "$STATUS" ]] && STATUS="PUBLISHED"
 
 if [[ -z "$TITLE" || -z "$DESCRIPTION" || -z "$AUTHOR" || -z "$DATE" ]]; then
@@ -82,21 +80,21 @@ aws s3 sync "$DIR" "s3://$ARTICLES_BUCKET/articles/$SLUG/" \
   --exclude ".*"
 
 echo ">> updating DynamoDB item slug=$SLUG status=$STATUS"
-ITEM_JSON="$(python3 - <<PY
-import json, os
-item = {
-  "slug": {"S": "$SLUG"},
-  "title": {"S": ${TITLE@Q}},
-  "description": {"S": ${DESCRIPTION@Q}},
-  "author": {"S": ${AUTHOR@Q}},
-  "publishedAt": {"S": "$DATE"},
-  "updatedAt": {"S": "$NOW"},
-  "status": {"S": "$STATUS"},
-  "s3Key": {"S": "articles/$SLUG/page.mdx"},
-}
-print(json.dumps(item))
-PY
-)"
+ITEM_JSON="$(SLUG="$SLUG" TITLE="$TITLE" DESCRIPTION="$DESCRIPTION" AUTHOR="$AUTHOR" \
+  DATE="$DATE" NOW="$NOW" STATUS="$STATUS" node -e '
+  const env = process.env;
+  const item = {
+    slug: { S: env.SLUG },
+    title: { S: env.TITLE },
+    description: { S: env.DESCRIPTION },
+    author: { S: env.AUTHOR },
+    publishedAt: { S: env.DATE },
+    updatedAt: { S: env.NOW },
+    status: { S: env.STATUS },
+    s3Key: { S: `articles/${env.SLUG}/page.mdx` },
+  };
+  process.stdout.write(JSON.stringify(item));
+')"
 
 aws dynamodb put-item \
   --table-name "$ARTICLES_TABLE" \
