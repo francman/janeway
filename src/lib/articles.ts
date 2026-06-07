@@ -56,6 +56,8 @@ async function fetchPublishedArticles(): Promise<ArticleWithSlug[]> {
     return []
   }
 
+  // TODO: handle LastEvaluatedKey pagination when total metadata exceeds 1 MB
+  // (~2000 articles at current shape). At <100 we're nowhere near.
   const res = await ddb.send(
     new QueryCommand({
       TableName: tableName,

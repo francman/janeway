@@ -12,15 +12,19 @@ set -euo pipefail
 #   description: ...
 #   author: ...
 #   date: 2026-01-15
-#   status: PUBLISHED    # optional, defaults to PUBLISHED
-#   tags: [aws, cost]    # optional
-#   coverImage: cover.png  # optional
+#   status: PUBLISHED      # optional, defaults to PUBLISHED. Must be PUBLISHED or DRAFT.
+#   tags: [aws, cost]      # optional, persisted as string set
+#   coverImage: cover.png  # optional, persisted as string
 #   ---
 #
 # Env vars (sourced from .env.local if present):
 #   ARTICLES_BUCKET, ARTICLES_TABLE, AWS_REGION   required
 #   AWS_PROFILE                                    optional, for SSO
-#   SITE_URL + REVALIDATE_SECRET                   optional, enables cache bust
+#   SITE_URL                                       optional, enables cache-bust ping
+#   REVALIDATE_SECRET                              optional. If unset, the script
+#                                                  fetches it from SSM at
+#                                                  $REVALIDATE_SECRET_PARAM
+#                                                  (defaults to /janeway/revalidate-secret).
 
 DIR="${1:-}"
 if [[ -z "$DIR" || ! -d "$DIR" ]]; then
@@ -35,6 +39,7 @@ fi
 : "${ARTICLES_BUCKET:?ARTICLES_BUCKET not set}"
 : "${ARTICLES_TABLE:?ARTICLES_TABLE not set}"
 : "${AWS_REGION:=us-east-1}"
+: "${REVALIDATE_SECRET_PARAM:=/janeway/revalidate-secret}"
 
 MDX_PATH="$DIR/page.mdx"
 if [[ ! -f "$MDX_PATH" ]]; then
@@ -43,45 +48,16 @@ if [[ ! -f "$MDX_PATH" ]]; then
 fi
 
 SLUG="$(basename "$DIR")"
+if ! [[ "$SLUG" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]]; then
+  echo "invalid slug '$SLUG' (must match ^[a-z0-9]+(-[a-z0-9]+)*\$)" >&2
+  exit 1
+fi
+
 NOW="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
-# One node call: parse frontmatter, validate required fields, emit shell-safe
-# exports (TITLE/DESCRIPTION/AUTHOR/DATE/STATUS) and the DynamoDB ITEM_JSON.
-eval "$(SLUG="$SLUG" NOW="$NOW" MDX_PATH="$MDX_PATH" node -e '
-  const fs = require("fs");
-  const matter = require("gray-matter");
-  const { data } = matter(fs.readFileSync(process.env.MDX_PATH, "utf8"));
-  const norm = (v) => v instanceof Date ? v.toISOString().slice(0, 10) : v;
-  const get = (k) => {
-    const v = norm(data[k]);
-    return v == null ? "" : (typeof v === "string" ? v : JSON.stringify(v));
-  };
-  const required = ["title", "description", "author", "date"];
-  for (const k of required) {
-    if (!get(k)) {
-      process.stderr.write(`frontmatter missing required field: ${k}\n`);
-      process.exit(1);
-    }
-  }
-  const status = get("status") || "PUBLISHED";
-  const item = {
-    slug: { S: process.env.SLUG },
-    title: { S: get("title") },
-    description: { S: get("description") },
-    author: { S: get("author") },
-    publishedAt: { S: get("date") },
-    updatedAt: { S: process.env.NOW },
-    status: { S: status },
-    s3Key: { S: `articles/${process.env.SLUG}/page.mdx` },
-  };
-  const shellEscape = (s) => `'\''${String(s).replace(/'\''/g, `'\''\\'\'\''\''`)}'\''`;
-  process.stdout.write(`TITLE=${shellEscape(get("title"))}\n`);
-  process.stdout.write(`DESCRIPTION=${shellEscape(get("description"))}\n`);
-  process.stdout.write(`AUTHOR=${shellEscape(get("author"))}\n`);
-  process.stdout.write(`DATE=${shellEscape(get("date"))}\n`);
-  process.stdout.write(`STATUS=${shellEscape(status)}\n`);
-  process.stdout.write(`ITEM_JSON=${shellEscape(JSON.stringify(item))}\n`);
-')"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PARSED="$(SLUG="$SLUG" NOW="$NOW" MDX_PATH="$MDX_PATH" node "$SCRIPT_DIR/lib/parse-article.js")"
+eval "$PARSED"
 
 echo ">> syncing $DIR -> s3://$ARTICLES_BUCKET/articles/$SLUG/"
 aws s3 sync "$DIR" "s3://$ARTICLES_BUCKET/articles/$SLUG/" \
@@ -95,15 +71,24 @@ aws dynamodb put-item \
   --region "$AWS_REGION" \
   --item "$ITEM_JSON" >/dev/null
 
-if [[ -n "${SITE_URL:-}" && -n "${REVALIDATE_SECRET:-}" ]]; then
-  # URL-encode secret + slug before assembling the curl URL.
-  ENCODED="$(SECRET="$REVALIDATE_SECRET" SLUG="$SLUG" node -e '
-    const enc = encodeURIComponent;
-    process.stdout.write(`?secret=${enc(process.env.SECRET)}&slug=${enc(process.env.SLUG)}`);
-  ')"
+# Resolve the revalidate secret: prefer env var, fall back to SSM Parameter Store.
+RESOLVED_SECRET="${REVALIDATE_SECRET:-}"
+if [[ -z "$RESOLVED_SECRET" && -n "${SITE_URL:-}" ]]; then
+  RESOLVED_SECRET="$(aws ssm get-parameter \
+    --name "$REVALIDATE_SECRET_PARAM" \
+    --with-decryption \
+    --region "$AWS_REGION" \
+    --query 'Parameter.Value' \
+    --output text 2>/dev/null || true)"
+fi
+
+if [[ -n "${SITE_URL:-}" && -n "$RESOLVED_SECRET" ]]; then
+  ENCODED_SLUG=$(SLUG="$SLUG" node -e 'process.stdout.write(encodeURIComponent(process.env.SLUG))')
   echo ">> revalidating $SITE_URL"
-  curl -fsS -X POST "$SITE_URL/api/revalidate$ENCODED" >/dev/null || \
-    echo "   revalidate ping failed (non-fatal)"
+  curl -fsS -X POST \
+    -H "Authorization: Bearer $RESOLVED_SECRET" \
+    "$SITE_URL/api/revalidate?slug=$ENCODED_SLUG" >/dev/null \
+    || echo "   revalidate ping failed (non-fatal)"
 fi
 
 echo ">> done: $SLUG"
