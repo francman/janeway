@@ -6,10 +6,6 @@ frontend:
         - npm ci
     build:
       commands:
-        # Amplify Hosting injects env vars into the build shell but NOT into the
-        # SSR Lambda runtime. Persist the ones we need into .env.production so
-        # Next.js inlines them at build time and they're available server-side.
-        - env | grep -E '^(ARTICLES_BUCKET|ARTICLES_TABLE|ARTICLES_IMAGE_CDN_URL|REVALIDATE_SECRET|SITE_URL|JANEWAY_AWS_|NEXT_PUBLIC_)=' >> .env.production
         - npm run build
   artifacts:
     baseDirectory: .next
