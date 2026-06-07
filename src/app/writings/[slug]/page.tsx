@@ -37,7 +37,7 @@ export default async function ArticlePage({ params }: PageProps) {
       <MDXRemote
         source={body}
         components={mdxComponents(slug)}
-        options={{ mdxOptions }}
+        options={{ mdxOptions, parseFrontmatter: true }}
       />
     </ArticleLayout>
   )
