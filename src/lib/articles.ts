@@ -20,12 +20,27 @@ export interface ArticleWithSlug extends Article {
 
 const PUBLISHED = 'PUBLISHED'
 
-const region = process.env.AWS_REGION ?? 'us-east-1'
+const region =
+  process.env.JANEWAY_AWS_REGION ?? process.env.AWS_REGION ?? 'us-east-1'
 const tableName = process.env.ARTICLES_TABLE
 const bucketName = process.env.ARTICLES_BUCKET
 
-const ddb = DynamoDBDocumentClient.from(new DynamoDBClient({ region }))
-const s3 = new S3Client({ region })
+// Amplify Hosting SSR Lambda doesn't expose its execution role's credentials
+// via the default provider chain (no AWS_* env vars, no IMDS). Use explicit
+// credentials when JANEWAY_AWS_* are set; otherwise fall back to the default
+// chain (which covers local SSO, dev, and any future runtime).
+const credentials =
+  process.env.JANEWAY_AWS_ACCESS_KEY_ID && process.env.JANEWAY_AWS_SECRET_ACCESS_KEY
+    ? {
+        accessKeyId: process.env.JANEWAY_AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.JANEWAY_AWS_SECRET_ACCESS_KEY,
+      }
+    : undefined
+
+const ddb = DynamoDBDocumentClient.from(
+  new DynamoDBClient({ region, credentials }),
+)
+const s3 = new S3Client({ region, credentials })
 
 let warnedTable = false
 let warnedBucket = false
