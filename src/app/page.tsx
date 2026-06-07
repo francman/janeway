@@ -26,6 +26,8 @@ import image5 from '@/images/photos/image-5.jpg'
 import { type ArticleWithSlug, getPublishedArticles } from '@/lib/articles'
 import { formatDate } from '@/lib/formatDate'
 
+export const dynamic = 'force-dynamic'
+
 function ArrowDownIcon(props: React.ComponentPropsWithoutRef<'svg'>) {
   return (
     <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" {...props}>

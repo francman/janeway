@@ -5,6 +5,8 @@ import { SimpleLayout } from '@/components/SimpleLayout'
 import { type ArticleWithSlug, getPublishedArticles } from '@/lib/articles'
 import { formatDate } from '@/lib/formatDate'
 
+export const dynamic = 'force-dynamic'
+
 function Article({ article }: { article: ArticleWithSlug }) {
   return (
     <article className="md:grid md:grid-cols-4 md:items-baseline">
