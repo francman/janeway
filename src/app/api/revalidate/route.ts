@@ -1,11 +1,14 @@
 import { revalidateTag } from 'next/cache'
 import { NextResponse, type NextRequest } from 'next/server'
 
+import { getRevalidateSecret } from '@/lib/revalidate-secret'
+
 export async function POST(request: NextRequest) {
   const secret = request.nextUrl.searchParams.get('secret')
   const slug = request.nextUrl.searchParams.get('slug')
 
-  if (!process.env.REVALIDATE_SECRET || secret !== process.env.REVALIDATE_SECRET) {
+  const expected = await getRevalidateSecret()
+  if (!expected || secret !== expected) {
     return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
   }
 

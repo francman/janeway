@@ -18,7 +18,6 @@ const inlinedEnv = Object.fromEntries(
     ARTICLES_TABLE: process.env.ARTICLES_TABLE,
     ARTICLES_IMAGE_CDN_URL: process.env.ARTICLES_IMAGE_CDN_URL,
     SITE_URL: process.env.SITE_URL,
-    REVALIDATE_SECRET: process.env.REVALIDATE_SECRET,
   }).filter(([, v]) => v !== undefined),
 )
 
