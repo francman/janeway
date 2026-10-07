@@ -45,7 +45,8 @@ npm start
 The regression suite uses isolated local services and synthetic credentials.
 It covers date/MDX rejection before AWS access, offline validation, failed
 uploads/commits, draft transitions, concurrent publishers, ambiguous outcomes,
-cache/revision consistency, and migration/resumption.
+cache/revision consistency, migration/resumption, and revalidation-secret
+failure recovery, concurrent refresh, expiry, and rotation.
 Production builds read content: configure their AWS environment deliberately.
 
 ## Content
@@ -172,6 +173,49 @@ failure is nonfatal: successful output includes `committed: true` and
 Refresh `/api/revalidate?slug=<slug>` with an authenticated POST instead of
 creating another content revision. Cached readers may temporarily show the
 previous complete revision.
+
+### Revalidation secret caching and rotation
+
+`POST /api/revalidate?slug=<slug>` authenticates the publisher's
+`Authorization: Bearer <secret>` against the SSM SecureString named by
+`REVALIDATE_SECRET_PARAM`. The server reads SSM, not the publisher's optional
+`REVALIDATE_SECRET` environment override.
+
+`src/lib/revalidate-secret.ts` caches a successful, nonempty lookup for five
+minutes per server process, measured with a monotonic clock from completion of
+the lookup. Requests within that window reuse the value without extending its
+lifetime. Concurrent lookups share one in-flight request; there is no background
+refresh or shared cross-process cache.
+
+An SSM error, missing parameter/value, or empty value is not cached. That request
+fails closed with HTTP 401, and a subsequent request can try again without a
+restart. An expired value is never a fallback when refresh fails. Error logs
+omit the underlying SSM error payload; API responses do not expose the secret.
+Existing AWS SDK retries remain unchanged.
+
+For rotation:
+
+1. Update the existing SecureString through an authorized, out-of-band workflow.
+   Do not put its value in source, command history, logs, or public build variables.
+2. If the publisher uses `REVALIDATE_SECRET`, update or unset that override so it
+   sends the current value. Changing the parameter name also requires coordinated
+   server/publisher configuration and IAM changes; value rotation does not.
+3. Allow existing server caches to expire. Each warm process can accept the
+   previous value and reject the new value until its own five-minute TTL expires.
+   There is no simultaneous old/new-secret grace period or synchronized refresh.
+   Once expired, the next request must successfully fetch SSM's current value.
+4. If publication committed but revalidation returned 401 during rotation or an
+   SSM outage, retry the authenticated revalidation POST after recovery rather
+   than publishing another revision. Revalidation failure is nonfatal to the
+   content commit; article data-cache expiry is independent of the secret cache.
+
+Cost: no new AWS resources, background jobs, S3 operations, or DynamoDB operations
+are introduced by this cache. With steady traffic and healthy SSM, a warm process
+performs roughly 12 successful lookups per hour rather than one per process
+lifetime. Idle processes do not refresh. Cold starts and failure retries can add
+requests; successive requests during an outage can each retry, although
+concurrent ones coalesce. Any additional SSM/KMS charges depend on the existing
+parameter, throughput, and KMS pricing configuration.
 
 ### Legacy migration and production cutover
 

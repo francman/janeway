@@ -5,11 +5,26 @@ const paramName = process.env.REVALIDATE_SECRET_PARAM ?? '/janeway/revalidate-se
 
 const ssm = new SSMClient({ region })
 
-let cached: Promise<string | null> | null = null
+const CACHE_TTL_MS = 5 * 60 * 1000
+let cached: { promise: Promise<string | null>; expiresAt: number } | null = null
+let inFlight: Promise<string | null> | null = null
 
 export function getRevalidateSecret(): Promise<string | null> {
-  if (!cached) cached = fetchSecret()
-  return cached
+  if (cached && performance.now() < cached.expiresAt) return cached.promise
+  if (inFlight) return inFlight
+
+  // An expired value must not authorize requests while its refresh is failing.
+  cached = null
+  const request = fetchSecret()
+  inFlight = request.then(secret => {
+    if (secret) {
+      cached = { promise: request, expiresAt: performance.now() + CACHE_TTL_MS }
+    }
+    return secret
+  }).finally(() => {
+    inFlight = null
+  })
+  return inFlight
 }
 
 async function fetchSecret(): Promise<string | null> {
@@ -17,9 +32,9 @@ async function fetchSecret(): Promise<string | null> {
     const res = await ssm.send(
       new GetParameterCommand({ Name: paramName, WithDecryption: true }),
     )
-    return res.Parameter?.Value ?? null
-  } catch (err) {
-    console.warn('[revalidate-secret] SSM fetch failed:', err)
+    return res.Parameter?.Value || null
+  } catch {
+    console.warn('[revalidate-secret] SSM fetch failed')
     return null
   }
 }
