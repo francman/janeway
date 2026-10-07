@@ -4,10 +4,12 @@ const fs = require('node:fs')
 const path = require('node:path')
 const vm = require('node:vm')
 const { createRequire } = require('node:module')
+const { pathToFileURL } = require('node:url')
 const ts = require('typescript')
 const { startContentStore } = require('./helpers/content-store.cjs')
 
 const root = path.resolve(__dirname, '..')
+let readerId = 0
 
 async function withReader(run) {
   const store = await startContentStore()
@@ -41,7 +43,10 @@ async function withReader(run) {
   }
   try {
     const articles = load('src/lib/articles.ts')
-    const { mdxComponents } = load('src/components/mdx.tsx')
+    const componentsUrl = pathToFileURL(path.join(root, 'src/components/mdx.mjs'))
+    // Each reader captures its own CDN environment and component cache.
+    componentsUrl.searchParams.set('reader', String(readerId++))
+    const { mdxComponents } = await import(componentsUrl.href)
     await run({ store, articles, mdxComponents, expire: () => cached.clear() })
     assert.deepEqual(store.state.errors, [])
   } finally {

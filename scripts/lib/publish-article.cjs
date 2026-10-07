@@ -7,7 +7,6 @@ const { randomUUID } = require('node:crypto')
 const { S3Client } = require('@aws-sdk/client-s3')
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb')
 const { SSMClient, GetParameterCommand } = require('@aws-sdk/client-ssm')
-const { parseArticle } = require('./parse-article.js')
 const { isRevisionKey } = require('../../src/lib/article-revision.js')
 const { stageRevision, readCurrentItem, commitRevision } = require('./publication.cjs')
 
@@ -58,8 +57,9 @@ async function revalidate(slug, region) {
 }
 
 async function main(args = process.argv.slice(2)) {
-  if (![1, 3].includes(args.length) || (args.length === 3 && args[1] !== '--expected-key')) {
-    throw new Error('usage: publish-article.sh <article-dir> [--expected-key <previous-s3Key|absent>]')
+  const validateOnly = args.length === 2 && args[1] === '--validate-only'
+  if (!validateOnly && (![1, 3].includes(args.length) || (args.length === 3 && args[1] !== '--expected-key'))) {
+    throw new Error('usage: publish-article.sh <article-dir> [--validate-only | --expected-key <previous-s3Key|absent>]')
   }
   const directory = path.resolve(args[0])
   if (!(await fs.lstat(directory)).isDirectory()) throw new Error(`Not an article directory: ${directory}`)
@@ -67,7 +67,6 @@ async function main(args = process.argv.slice(2)) {
   const bucket = process.env.ARTICLES_BUCKET
   const table = process.env.ARTICLES_TABLE
   const region = process.env.AWS_REGION || 'us-east-1'
-  if (!bucket || !table) throw new Error('ARTICLES_BUCKET and ARTICLES_TABLE must be set')
   const revision = randomUUID()
   const prefix = `articles/${slug}/revisions/${revision}/`
   const s3Key = `${prefix}page.mdx`
@@ -77,8 +76,14 @@ async function main(args = process.argv.slice(2)) {
   if (!mdx) throw new Error(`missing ${path.join(directory, 'page.mdx')}`)
   let item
   try {
-    item = parseArticle({ slug, source: mdx.body.toString('utf8'), s3Key, now: new Date().toISOString() })
+    const { validateArticle } = await import('./validate-article.mjs')
+    item = await validateArticle({ slug, source: mdx.body.toString('utf8'), s3Key, now: new Date().toISOString() })
   } catch (error) { throw new Error(`${path.join(directory, 'page.mdx')}: ${error.message}`) }
+  if (validateOnly) {
+    console.log(JSON.stringify({ slug, valid: true, publishedAt: item.publishedAt.S, status: item.status.S }))
+    return
+  }
+  if (!bucket || !table) throw new Error('ARTICLES_BUCKET and ARTICLES_TABLE must be set')
   const requestedKey = args.length === 3 ? (args[2] === 'absent' ? null : args[2]) : undefined
   if (requestedKey !== undefined && requestedKey !== null && !isRevisionKey(slug, requestedKey)) {
     throw new Error('--expected-key must be this article\'s immutable pointer or "absent"')

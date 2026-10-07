@@ -4,7 +4,7 @@ set -euo pipefail
 # Publish an immutable article revision, then conditionally commit its metadata.
 #
 # Usage:
-#   ./scripts/publish-article.sh path/to/article-dir [--expected-key <key|absent>]
+#   ./scripts/publish-article.sh path/to/article-dir [--validate-only | --expected-key <key|absent>]
 #
 # The directory must contain page.mdx with YAML frontmatter:
 #   ---
@@ -25,13 +25,16 @@ set -euo pipefail
 #                                                  fetches it from SSM at
 #                                                  $REVALIDATE_SECRET_PARAM
 #                                                  (defaults to /janeway/revalidate-secret).
+#
+# --validate-only runs the same date/MDX preflight without AWS access or loading
+# .env.local. It executes trusted article MDX; it is not a sandbox.
 
 if [[ $# -eq 0 ]]; then
-  echo "usage: $0 <article-dir> [--expected-key <key|absent>]" >&2
+  echo "usage: $0 <article-dir> [--validate-only | --expected-key <key|absent>]" >&2
   exit 1
 fi
 
-if [[ -f .env.local ]]; then
+if [[ "${2:-}" != "--validate-only" && -f .env.local ]]; then
   set -a; source .env.local; set +a
 fi
 

@@ -43,8 +43,9 @@ npm start
 ```
 
 The regression suite uses isolated local services and synthetic credentials.
-It covers failed uploads/commits, draft transitions, concurrent publishers,
-ambiguous outcomes, cache/revision consistency, and migration/resumption.
+It covers date/MDX rejection before AWS access, offline validation, failed
+uploads/commits, draft transitions, concurrent publishers, ambiguous outcomes,
+cache/revision consistency, and migration/resumption.
 Production builds read content: configure their AWS environment deliberately.
 
 ## Content
@@ -67,11 +68,12 @@ Amplify rebuild once the revision-aware reader has been deployed.
 ./scripts/publish-article.sh content/articles/<slug>
 ```
 
-The shell entry point loads `.env.local` from the current working directory.
+For publication, the shell entry point loads `.env.local` from the current working directory.
 It runs `scripts/lib/publish-article.cjs`, which:
 
-1. Captures the local files once and parses metadata from those captured MDX
-   bytes. Hidden files are skipped; symlinks are rejected.
+1. Captures the local files once, validates their frontmatter/calendar date,
+   and compiles and renders the captured MDX before any AWS operation. Hidden
+   files are skipped; symlinks are rejected.
 2. Consistently reads the current DynamoDB item and remembers its `s3Key`.
 3. Uploads every file to a new immutable prefix:
    `articles/<slug>/revisions/<uuid-v4>/`. The body is `page.mdx`; relative image
@@ -94,8 +96,54 @@ unchanged. Changing status does not revoke previously rendered pages or public
 image URLs. Raw MDX access remains protected separately by the infra
 CloudFront function and bucket policy; `Cache-Control` is not access control.
 
-Basic frontmatter validation remains in place. Full MDX/date preflight
-validation is tracked separately in app issue #10.
+### Validate an article without publishing
+
+```bash
+./scripts/publish-article.sh content/articles/penny-trickle-aws-cost-reduction --validate-only
+```
+
+This runs the same preflight as publication, but requires no AWS credentials,
+bucket/table configuration, or network access and does not load `.env.local`.
+Success prints JSON containing `slug`, `valid`, `publishedAt`, and `status`.
+Failure exits nonzero and identifies the article file and cause. Independent
+frontmatter and MDX failures are reported together when both can be evaluated.
+Do not combine `--validate-only` with `--expected-key`.
+
+The content contract is:
+
+- `title`, `description`, `author`, and `date` must be nonblank strings.
+- Dates must be real calendar dates in canonical `YYYY-MM-DD` form. Normal
+  unquoted YAML dates, quoted dates, and explicit YAML timestamp tags are
+  accepted when they contain that exact date-only form. Impossible dates,
+  times, noncanonical formats, and quoted surrounding whitespace are rejected.
+  YAML timestamp scalars are checked before conversion can roll February 30
+  into March.
+- MDX must compile **and render** using the same frontmatter mode, GFM/Prism
+  plugins, and image components as the website. Missing runtime components
+  fail validation, not just malformed syntax.
+- Markdown, GFM tables, fenced code, comments, and supported literal JSX
+  remain valid. The custom component mapping supports `img`; arbitrary named
+  components are not supplied.
+- JavaScript expressions, imports/exports, JSX expression-valued attributes,
+  and spread attributes are rejected explicitly. The underlying compiler
+  would otherwise silently remove them. JavaScript blocking stays enabled.
+  MDX comments and empty expressions intentionally produce no output.
+
+`scripts/lib/validate-article.mjs` is the shared preflight entry point.
+`src/lib/mdx-options.mjs` defines the full compiler options and unsupported
+syntax checks; `src/components/mdx.mjs` defines the actual production image
+mapping. These are Node-loadable modules, not a second validator-specific
+plugin/component list.
+
+This is for trusted local article sources, not a sandbox or a hosted upload
+service. It renders MDX locally but does not check remote links or download
+images. Validation failure leaves S3, DynamoDB metadata, and caches untouched.
+Fix the reported source errors and rerun validation before publishing.
+
+Validation adds local CPU work, not an AWS service, table, index, or data
+migration. The shared syntax guard also runs during existing server rendering;
+no additional AWS requests are introduced by validation. Deploying app changes
+still incurs ordinary Amplify build/hosting usage.
 
 ### Failure and retry procedure
 

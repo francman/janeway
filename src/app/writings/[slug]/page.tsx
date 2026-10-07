@@ -4,8 +4,8 @@ import { MDXRemote } from 'next-mdx-remote/rsc'
 
 import { ArticleLayout } from '@/components/ArticleLayoutRSC'
 import { getArticleBySlug, getArticleMdx } from '@/lib/articles'
-import { mdxComponents } from '@/components/mdx'
-import { mdxOptions } from '@/lib/mdx-options'
+import { mdxComponents } from '@/components/mdx.mjs'
+import { mdxRemoteOptions } from '@/lib/mdx-options.mjs'
 
 interface PageProps {
   params: Promise<{ slug: string }>
@@ -35,7 +35,7 @@ export default async function ArticlePage({ params }: PageProps) {
       <MDXRemote
         source={body}
         components={mdxComponents(article)}
-        options={{ mdxOptions, parseFrontmatter: true }}
+        options={mdxRemoteOptions}
       />
     </ArticleLayout>
   )
