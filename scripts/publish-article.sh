@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Publish an article from a local directory to S3 + DynamoDB.
+# Publish an immutable article revision, then conditionally commit its metadata.
 #
 # Usage:
-#   ./scripts/publish-article.sh path/to/article-dir
+#   ./scripts/publish-article.sh path/to/article-dir [--expected-key <key|absent>]
 #
 # The directory must contain page.mdx with YAML frontmatter:
 #   ---
@@ -26,9 +26,8 @@ set -euo pipefail
 #                                                  $REVALIDATE_SECRET_PARAM
 #                                                  (defaults to /janeway/revalidate-secret).
 
-DIR="${1:-}"
-if [[ -z "$DIR" || ! -d "$DIR" ]]; then
-  echo "usage: $0 <article-dir>" >&2
+if [[ $# -eq 0 ]]; then
+  echo "usage: $0 <article-dir> [--expected-key <key|absent>]" >&2
   exit 1
 fi
 
@@ -36,59 +35,5 @@ if [[ -f .env.local ]]; then
   set -a; source .env.local; set +a
 fi
 
-: "${ARTICLES_BUCKET:?ARTICLES_BUCKET not set}"
-: "${ARTICLES_TABLE:?ARTICLES_TABLE not set}"
-: "${AWS_REGION:=us-east-1}"
-: "${REVALIDATE_SECRET_PARAM:=/janeway/revalidate-secret}"
-
-MDX_PATH="$DIR/page.mdx"
-if [[ ! -f "$MDX_PATH" ]]; then
-  echo "missing $MDX_PATH" >&2
-  exit 1
-fi
-
-SLUG="$(basename "$DIR")"
-if ! [[ "$SLUG" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]]; then
-  echo "invalid slug '$SLUG' (must match ^[a-z0-9]+(-[a-z0-9]+)*\$)" >&2
-  exit 1
-fi
-
-NOW="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PARSED="$(SLUG="$SLUG" NOW="$NOW" MDX_PATH="$MDX_PATH" node "$SCRIPT_DIR/lib/parse-article.js")"
-eval "$PARSED"
-
-echo ">> syncing $DIR -> s3://$ARTICLES_BUCKET/articles/$SLUG/"
-aws s3 sync "$DIR" "s3://$ARTICLES_BUCKET/articles/$SLUG/" \
-  --region "$AWS_REGION" \
-  --delete \
-  --exclude ".*"
-
-echo ">> updating DynamoDB item slug=$SLUG status=$STATUS"
-aws dynamodb put-item \
-  --table-name "$ARTICLES_TABLE" \
-  --region "$AWS_REGION" \
-  --item "$ITEM_JSON" >/dev/null
-
-# Resolve the revalidate secret: prefer env var, fall back to SSM Parameter Store.
-RESOLVED_SECRET="${REVALIDATE_SECRET:-}"
-if [[ -z "$RESOLVED_SECRET" && -n "${SITE_URL:-}" ]]; then
-  RESOLVED_SECRET="$(aws ssm get-parameter \
-    --name "$REVALIDATE_SECRET_PARAM" \
-    --with-decryption \
-    --region "$AWS_REGION" \
-    --query 'Parameter.Value' \
-    --output text 2>/dev/null || true)"
-fi
-
-if [[ -n "${SITE_URL:-}" && -n "$RESOLVED_SECRET" ]]; then
-  ENCODED_SLUG=$(SLUG="$SLUG" node -e 'process.stdout.write(encodeURIComponent(process.env.SLUG))')
-  echo ">> revalidating $SITE_URL"
-  curl -fsS -X POST \
-    -H "Authorization: Bearer $RESOLVED_SECRET" \
-    "$SITE_URL/api/revalidate?slug=$ENCODED_SLUG" >/dev/null \
-    || echo "   revalidate ping failed (non-fatal)"
-fi
-
-echo ">> done: $SLUG"
+exec node "$SCRIPT_DIR/lib/publish-article.cjs" "$@"

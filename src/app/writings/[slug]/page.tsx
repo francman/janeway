@@ -25,18 +25,16 @@ export async function generateMetadata({
 
 export default async function ArticlePage({ params }: PageProps) {
   const { slug } = await params
-  const [article, body] = await Promise.all([
-    getArticleBySlug(slug),
-    getArticleMdx(slug),
-  ])
-
-  if (!article || !body) notFound()
+  const article = await getArticleBySlug(slug)
+  if (!article) notFound()
+  const body = await getArticleMdx(article)
+  if (!body) notFound()
 
   return (
     <ArticleLayout article={article}>
       <MDXRemote
         source={body}
-        components={mdxComponents(slug)}
+        components={mdxComponents(article)}
         options={{ mdxOptions, parseFrontmatter: true }}
       />
     </ArticleLayout>

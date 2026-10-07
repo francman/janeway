@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import { unstable_cache } from 'next/cache'
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
 import {
@@ -6,6 +7,7 @@ import {
   QueryCommand,
 } from '@aws-sdk/lib-dynamodb'
 import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import { isRevisionKey } from './article-revision'
 
 interface Article {
   title: string
@@ -16,6 +18,7 @@ interface Article {
 
 export interface ArticleWithSlug extends Article {
   slug: string
+  s3Key: string
 }
 
 const PUBLISHED = 'PUBLISHED'
@@ -41,8 +44,12 @@ function warnMissingBucket() {
 }
 
 function rowToArticle(row: Record<string, unknown>): ArticleWithSlug {
+  if (!isRevisionKey(row.slug as string, row.s3Key)) {
+    throw new Error(`Article "${row.slug}" has no committed revision; migrate metadata before deploying this reader`)
+  }
   return {
     slug: row.slug as string,
+    s3Key: row.s3Key as string,
     title: row.title as string,
     description: row.description as string,
     author: row.author as string,
@@ -84,6 +91,7 @@ async function fetchArticleBySlug(
     new GetCommand({
       TableName: tableName,
       Key: { slug },
+      ConsistentRead: true,
     }),
   )
 
@@ -91,7 +99,7 @@ async function fetchArticleBySlug(
   return rowToArticle(res.Item)
 }
 
-async function fetchArticleMdx(slug: string): Promise<string | null> {
+async function fetchArticleMdx(s3Key: string): Promise<string | null> {
   if (!bucketName) {
     warnMissingBucket()
     return null
@@ -101,7 +109,7 @@ async function fetchArticleMdx(slug: string): Promise<string | null> {
     const res = await s3.send(
       new GetObjectCommand({
         Bucket: bucketName,
-        Key: `articles/${slug}/page.mdx`,
+        Key: s3Key,
       }),
     )
     const body = await res.Body?.transformToString()
@@ -119,20 +127,26 @@ async function fetchArticleMdx(slug: string): Promise<string | null> {
 
 export const getPublishedArticles = unstable_cache(
   fetchPublishedArticles,
-  ['articles:list'],
+  ['articles:revisions:list'],
   { tags: ['articles:list'], revalidate: 300 },
 )
 
-export const getArticleBySlug = (slug: string) =>
+// React memoization pins generateMetadata and the page to one snapshot per render.
+export const getArticleBySlug = cache((slug: string) =>
   unstable_cache(
     () => fetchArticleBySlug(slug),
-    ['articles:meta', slug],
+    ['articles:revisions:meta', slug],
     { tags: [`article:${slug}`, 'articles:list'], revalidate: 300 },
-  )()
+  )(),
+)
 
-export const getArticleMdx = (slug: string) =>
-  unstable_cache(
-    () => fetchArticleMdx(slug),
-    ['articles:mdx', slug],
-    { tags: [`article:${slug}`], revalidate: 300 },
+export const getArticleMdx = (article: Pick<ArticleWithSlug, 'slug' | 's3Key'>) => {
+  if (!isRevisionKey(article.slug, article.s3Key)) {
+    throw new Error('An immutable article revision is required to read MDX')
+  }
+  return unstable_cache(
+    () => fetchArticleMdx(article.s3Key),
+    ['articles:mdx', article.s3Key],
+    { tags: [`article:${article.slug}`], revalidate: 300 },
   )()
+}
