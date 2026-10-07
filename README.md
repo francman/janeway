@@ -63,6 +63,47 @@ Production builds read content: configure their AWS environment deliberately.
 Article routes remain `/writings/<slug>`. Publishing content does not require an
 Amplify rebuild once the revision-aware reader has been deployed.
 
+### Résumé PDF
+
+The homepage's **Download Resume** button serves a PDF through the existing
+CloudFront asset distribution, not GitHub Pages. The origin remains private:
+unauthenticated S3 access is denied while the CDN can serve the published PDF.
+No new bucket, database, authentication service, or SSR write permission is needed.
+
+The initial PDF is an unchanged copy of `francman/francman.github.io/resume.pdf`
+at commit `05c3a17be799c1c6645b80ac4e7126a65eccdac6` (July 9, 2025), not a rebuild
+of the separate LaTeX résumé variants. It is 81,057 bytes with SHA-256
+`81f056837083986eeaf7f5dd398e9ae921cfaa000a8e7ba41b8d442d0c72e1e7`.
+The GitHub source/history is retained.
+
+Published keys follow
+`s3://janeway-articles-486207805298-us-east-1/documents/resume/revisions/<sha256>/frank-manu-resume.pdf`.
+The current homepage links directly to that immutable CDN URL.
+
+To replace the PDF:
+
+1. Obtain the owner-approved PDF and calculate its SHA-256. Do not silently
+   substitute an older document or choose a LaTeX role variant.
+2. Upload to its new hash-qualified key using `If-None-Match: *`, never overwrite
+   a published key. Set `Content-Type: application/pdf`,
+   `Content-Disposition: attachment; filename="Frank-Manu-Resume.pdf"`, and
+   `Cache-Control: public,max-age=31536000,immutable`. Record source provenance
+   and the checksum in object metadata.
+3. Verify CDN HEAD/GET status, headers, and downloaded SHA-256 before changing
+   the homepage. Direct unsigned S3 access must still be denied.
+4. Update the `Resume()` button URL in `src/app/page.tsx`. Verify a real browser
+   click/download at desktop and 390px mobile widths. Pushing `deploy` triggers
+   Amplify; verify the public homepage and download after that release.
+
+Retain prior immutable PDFs so previously shared URLs remain valid. No CDN
+invalidation or article DynamoDB update is required. Storage, requests, and
+delivery remain usage-based, including retained versions.
+
+[Dashboard issue #11](https://github.com/francman/janeway/issues/11) scopes a future
+Cognito-protected upload workflow and a stable public download route so résumé
+updates no longer require a website deployment. It is not implemented by this
+hosting repair.
+
 ## Atomic article publication
 
 ```bash

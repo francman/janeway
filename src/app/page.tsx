@@ -154,7 +154,7 @@ function Resume() {
         ))}
       </ol>
       <Button
-        href="https://francman.github.io/resume.pdf"
+        href="https://d343w34l5jqzb2.cloudfront.net/documents/resume/revisions/81f056837083986eeaf7f5dd398e9ae921cfaa000a8e7ba41b8d442d0c72e1e7/frank-manu-resume.pdf"
         variant="secondary"
         className="group mt-6 w-full"
       >
