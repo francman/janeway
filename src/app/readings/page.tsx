@@ -111,8 +111,9 @@ function LinkIcon(props: React.ComponentPropsWithoutRef<'svg'>) {
 }
 
 export const metadata: Metadata = {
-  title: 'Projects',
-  description: 'Things I’ve made trying to put my dent in the universe.',
+  title: 'Readings',
+  description:
+    'Books, audiobooks, research papers, and stories that inspire Frank Manu’s thinking and imagination.',
 }
 
 export default function Projects() {

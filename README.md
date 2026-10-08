@@ -63,6 +63,15 @@ Production builds read content: configure their AWS environment deliberately.
 Article routes remain `/writings/<slug>`. Publishing content does not require an
 Amplify rebuild once the revision-aware reader has been deployed.
 
+### Page metadata
+
+Each page supplies its own title and description through Next.js `metadata`.
+The root layout applies `%s - Frank Manu`; page titles must not duplicate that
+suffix. Readings describes the reading list, independently of Projects.
+Verify the rendered title and single description tag in both server HTML and
+the browser after direct loads and desktop/mobile menu navigation. Navigate
+between Readings and Projects in both directions to catch stale route metadata.
+
 ### Readings artwork
 
 `src/app/readings/page.tsx` renders artwork at the full card width with automatic
