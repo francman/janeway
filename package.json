@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --ext .js,.jsx,.mjs,.ts,.tsx",
-    "test": "node --test test/*.test.cjs"
+    "test": "node --test test/*.test.cjs",
+    "test:release-smoke": "node --test test/release-smoke/*.test.cjs",
+    "smoke:release": "node scripts/release-smoke.cjs"
   },
   "browserslist": "defaults, not ie <= 11",
   "dependencies": {
@@ -41,6 +43,7 @@
     "@types/react-dom": "^19.2.3",
     "eslint": "8.45.0",
     "eslint-config-next": "^15.0.4",
+    "playwright": "1.64.0",
     "prettier": "^3.0.1",
     "prettier-plugin-tailwindcss": "^0.5.2",
     "sharp": "^0.32.0"

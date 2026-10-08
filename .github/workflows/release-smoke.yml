@@ -1,0 +1,97 @@
+name: Verify deployed release
+
+# Run AFTER Amplify/CDK finishes, not on push: a push-time check can test the old site.
+# This workflow never deploys. Hosting/release automation may call workflow_call
+# after its own deployment wait, or dispatch this workflow through the GitHub API.
+on:
+  workflow_dispatch:
+    inputs:
+      site_url:
+        description: Deployed website origin (after deployment succeeds)
+        required: true
+        default: https://www.frankmanu.com
+        type: string
+      cdn_url:
+        description: Deployed article CDN origin
+        required: true
+        default: https://d343w34l5jqzb2.cloudfront.net
+        type: string
+      smoke_ref:
+        description: Janeway commit/ref containing the checker and fixture
+        required: true
+        default: deploy
+        type: string
+      app_revision:
+        description: Reviewed deployed app revision (operator supplied, not attested)
+        type: string
+      infra_revision:
+        description: Reviewed deployed infra revision (operator supplied, not attested)
+        type: string
+  workflow_call:
+    inputs:
+      site_url:
+        required: true
+        type: string
+      cdn_url:
+        required: true
+        type: string
+      smoke_ref:
+        required: true
+        type: string
+      app_revision:
+        type: string
+        default: ''
+      infra_revision:
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  public-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SITE_URL: ${{ inputs.site_url }}
+      ARTICLES_IMAGE_CDN_URL: ${{ inputs.cdn_url }}
+      APP_REVISION: ${{ inputs.app_revision }}
+      INFRA_REVISION: ${{ inputs.infra_revision }}
+    steps:
+      - name: Check out the shared checker
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: francman/janeway
+          ref: ${{ inputs.smoke_ref }}
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Record checker revision
+        run: echo "SMOKE_REVISION=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+      - name: Install locked dependencies and Chromium
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Prove isolated failure detection and restoration
+        run: npm run test:release-smoke
+      - name: Verify the deployed public contract
+        run: npm run smoke:release -- --out out/release-smoke
+      - name: Publish verification summary
+        if: always()
+        run: |
+          if test -f out/release-smoke/summary.md; then
+            cat out/release-smoke/summary.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'Release NOT verified: setup, regression checks, or smoke preflight failed before a report was produced. Inspect the failed step.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Preserve public verification evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+          path: out/release-smoke/
+          if-no-files-found: warn
+          retention-days: 14

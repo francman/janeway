@@ -1,0 +1,21 @@
+{
+  "canonicalOrigin": "https://www.frankmanu.com",
+  "homepageMarker": "Electrical, computer and systems engineer.",
+  "writingsMarker": "Cogito, ergo sum ... I think therefore I am.",
+  "article": {
+    "slug": "penny-trickle-aws-cost-reduction",
+    "title": "Penny Trickle | My AWS Cost Reduction",
+    "description": "I almost had to reduce my beer budget, but then, I remembered all the talk about AWS Optimization and how AWS is helping customers save cost. With a closer look at available options, I was able to reduce my cost of using AWS for webhosting by ~92%.",
+    "author": "Frank Manu",
+    "publishedAt": "2023-11-03",
+    "bodyMarker": "reduce my cost of using AWS for webhosting by ~92%.",
+    "imageFilename": "penny_trickle.png"
+  },
+  "missingPath": "/writings/release-smoke-not-found",
+  "mobile": {
+    "path": "/readings",
+    "cardSelector": "main ul[role=\"list\"] > li",
+    "imageSelector": "img",
+    "titleSelector": "h2"
+  }
+}

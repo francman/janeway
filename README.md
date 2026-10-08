@@ -49,6 +49,105 @@ cache/revision consistency, migration/resumption, and revalidation-secret
 failure recovery, concurrent refresh, expiry, and rotation.
 Production builds read content: configure their AWS environment deliberately.
 
+## Post-release public smoke
+
+The release owner runs this **after** Amplify reports `SUCCEED`, or after an
+approved infrastructure update and CloudFront deployment finish. A passing build,
+CDK synthesis, or push-time check is not proof of the newly deployed site.
+
+The shared implementation is `scripts/release-smoke.cjs`; the explicit known
+article and expected content are in `scripts/release-smoke.production.json`.
+Use Node 22 (matching CI), install the locked dependencies, and install Chromium:
+
+```bash
+npm ci
+npx playwright install chromium
+SITE_URL=https://www.frankmanu.com \
+ARTICLES_IMAGE_CDN_URL=https://d343w34l5jqzb2.cloudfront.net \
+npm run smoke:release -- --out out/release-smoke-my-release
+```
+
+Use a **new output directory** for each run. The command refuses to overwrite
+prior evidence. It does not load `.env.local`, need AWS credentials, publish
+content, revalidate caches, fetch secrets, or deploy anything. Browser requests
+are restricted to GET/HEAD on the configured site/CDN; third-party requests,
+mutations, WebSockets, and unexpected redirects are blocked.
+
+Required checks cover usable homepage/writings content, the known article's
+visible title and MDX body, initial crawler HTML sharing identity, its actual
+decoded immutable CDN image, canonical/encoded legacy and revision MDX denial,
+a real missing-article 404, and mobile Readings geometry after all images decode.
+Source probes require **403**: 404, redirects, network errors, and successful
+source responses do not count as protection. Source response bodies are never
+read into the report. The reserved missing slug must remain unpublished.
+
+Outputs are `report.json`, `summary.md`, `article.png`, and `mobile.png`; failures
+retain available evidence and exit nonzero. JSON includes source probe statuses
+and measured mobile rectangles. AWS configuration/IAM and deployed revision
+identity are explicitly **skipped**, not inferred from public success.
+Optional `APP_REVISION` and `INFRA_REVISION` record operator-supplied review
+context; `SMOKE_REVISION` identifies the checker. They are not runtime attestation.
+Separately confirm the intended Amplify job/CloudFormation update before calling
+the public release verified. Unavailable AWS access leaves that confirmation
+blocked; do not treat it as a pass.
+
+### GitHub release entry points
+
+Both repositories expose **Actions → Verify deployed release → Run workflow**.
+Janeway owns the reusable `.github/workflows/release-smoke.yml`; janeway-infra
+calls it at a pinned app commit with the same checker checkout. There is no
+duplicated checker and no automatic deployment. Workflows use `contents: read`,
+no AWS credentials or inherited secrets, and publish a job summary plus a
+14-day `release-smoke-<run>-<attempt>` artifact.
+
+After confirming deployment, dispatch from either release path:
+
+```bash
+gh workflow run release-smoke.yml --repo francman/janeway --ref deploy \
+  -f site_url=https://www.frankmanu.com \
+  -f cdn_url=https://d343w34l5jqzb2.cloudfront.net \
+  -f smoke_ref=deploy -f app_revision=REVIEWED_APP_COMMIT
+
+gh workflow run release-smoke.yml --repo francman/janeway-infra --ref main \
+  -f site_url=https://www.frankmanu.com \
+  -f cdn_url=https://d343w34l5jqzb2.cloudfront.net \
+  -f app_revision=REVIEWED_APP_COMMIT -f infra_revision=REVIEWED_INFRA_COMMIT
+```
+
+Replace revision values with reviewed commits, or omit unavailable values.
+Prefer an exact `smoke_ref` when reproducing an app run. Update both the reusable
+workflow pin and `smoke_ref` in the infra caller when adopting checker changes.
+Hosting/release automation can dispatch this workflow through the GitHub API or
+call `workflow_call` **after its own deployment wait**. It is deliberately not
+triggered on `push`, which could inspect the old deployment while Amplify builds.
+The current release owner must dispatch it; it is not continuous monitoring.
+
+A release is **not publicly verified** if setup/regression checks fail, any
+required smoke fails, or artifacts are missing. Inspect the failing invariant,
+URL, source probe results, and browser evidence; fix the deployment/checker as
+appropriate and run again with fresh artifacts. Never weaken MDX denial or
+skip image/layout checks to make a release green. Update fixture expectations
+only for reviewed intentional content changes, not to hide unexpected output.
+The immutable revision path is discovered from the rendered article image, so
+normal republishing does not require pinning a new revision UUID in the fixture.
+
+### Isolated failure demonstrations
+
+```bash
+npm run test:release-smoke
+```
+
+This separate browser suite uses local HTTP servers, generated PNGs, and
+temporary artifacts. It proves healthy/restored behavior, error-shell rejection,
+wrong sharing identity, corrupt image detection, each exposed MDX alias,
+soft 404 rejection, image/title and card overlap, overflow, empty layouts, and
+startup DOM replacement. It also verifies CLI failure and preserved prior
+evidence. The default `npm test` remains browser-free. CI installs Chromium with
+`--with-deps` and runs this suite before the public smoke.
+
+No new AWS resources are needed. Normal public request/transfer costs apply;
+GitHub Actions runner minutes and artifact storage depend on account allowances.
+
 ## Content
 
 - `src/app/page.tsx`: homepage, work history, education, recent writings.
