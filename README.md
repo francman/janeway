@@ -65,17 +65,21 @@ Amplify rebuild once the revision-aware reader has been deployed.
 
 ### Readings artwork
 
-`src/app/readings/page.tsx` keeps artwork inside the existing 112px thumbnail
-rows with full-width/full-height image boxes and `object-contain`. Images retain
-their aspect ratio without cropping; title spacing and whole-card links stay
-unchanged. The responsive `sizes` expression follows `Container` padding,
+`src/app/readings/page.tsx` renders artwork at the full card width with automatic
+height, preserving each image's natural aspect ratio without cropping or
+letterboxing. The image wrapper grows in normal flow, keeping the title below
+the image with the existing spacing. Taller cards are intentional; there is no
+fixed-height thumbnail row. Whole-card links stay unchanged.
+The responsive `sizes` expression follows `Container` padding,
 maximum content widths, and the grid's 48px column gaps: one column below 640px,
 two below 1024px (up to 312px each), and four above (up to 220px each).
 Revisit those sizes if the container or grid geometry changes.
 
 For layout verification, check all eight cards at 320, 390, 768, and 1440px in
 light and dark themes. Scroll each image into view and wait for successful image
-decoding before measuring its bounds against the thumbnail row and heading.
+decoding before measuring its bounds against the wrapper and heading. Confirm
+the image fills the card width, its height matches its intrinsic aspect ratio,
+and the wrapper grows to contain it rather than constraining it to a fixed height.
 Check for horizontal overflow and verify clicks on the image, title/author, and
 description reach that card's link. Capture the Shannon card at 390px after
 decoding; unloaded-image screenshots can miss the original overlap.
