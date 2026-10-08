@@ -288,6 +288,49 @@ unchanged. Changing status does not revoke previously rendered pages or public
 image URLs. Raw MDX access remains protected separately by the infra
 CloudFront function and bucket policy; `Cache-Control` is not access control.
 
+### Image freshness and cache ownership
+
+Replace an image locally and publish normally, even when keeping its filename.
+The publisher assigns a new revision directory, so `cover.png` in revision B
+has a different full URL from `cover.png` in revision A. Never overwrite a
+published revision, reuse its UUID, or append `?v=...` as a substitute: the
+article CloudFront policy excludes query strings from its cache key.
+
+| Layer | Freshness contract |
+| --- | --- |
+| Next.js article metadata/list and MDX data caches | Configured `revalidate: 300` seconds. Successful authenticated revalidation invalidates the list and affected article tags so a new render can select the committed pointer. The TTL is request-driven revalidation, not a guaranteed five-minute visibility deadline if refresh fails. |
+| CloudFront article images | New revision path selects new bytes. Origin asset headers are `public,max-age=31536000,immutable`; the managed policy permits up to one year. Its 24-hour default applies when origin freshness headers are absent, not to these new immutable assets. |
+| Browser images | The same immutable header allows reuse of old URLs without network access. A refreshed page requests B's new URL; already-open pages are not pushed an update and may keep showing their complete A revision until refreshed/navigated. |
+
+`POST /api/revalidate` does **not** purge CloudFront or browser images. That is
+intentional: A's old URL must continue serving A, and unrelated image caches
+remain useful. Shared list-tag invalidation can refresh other server metadata;
+it does not invalidate their asset URLs. No CloudFront invalidation permission,
+cache-busting query string, or SSR write grant is needed.
+
+If publication reports `committed: true` but `revalidated: false`, inspect the
+committed pointer and retry authenticated revalidation using the procedure below;
+do not publish another revision just to retry refresh. Retain old revision
+objects so cached pages and shared links still work. Retention consumes storage;
+this change does not introduce an automatic deletion policy.
+
+**Verified rehearsal — 2026-10-08:** the real publisher and production-mode Next
+reader ran against isolated S3/DynamoDB/SSM endpoints and a local HTTP caching
+edge. A red A image and unrelated green image were warmed in that edge and in
+Chromium. Publishing blue B at the same relative filename committed a new
+pointer and successfully revalidated Next. The refreshed page displayed B at
+the new URL; old A and the unrelated image retained their original bytes and
+warm browser/edge caches. HTTP SHA-256, cache headers, rendered pixels,
+Chromium `Network.requestServedFromCache`, and edge/origin counters agreed.
+
+The controlled edge used a path-only cache key and retained the publisher's
+immutable headers; it was **not an AWS CloudFront A-to-B publication test**.
+A separate read-only production check observed `Hit from cloudfront` at
+`BOS50-P6` and Chromium browser-cache reuse for the existing article image.
+No production article was edited and no AWS test resources were created.
+Full paths, checksums, measurements, and reproduction steps are tracked in
+[infra #3](https://github.com/francman/janeway-infra/issues/3).
+
 ### Validate an article without publishing
 
 ```bash
