@@ -63,6 +63,23 @@ Production builds read content: configure their AWS environment deliberately.
 Article routes remain `/writings/<slug>`. Publishing content does not require an
 Amplify rebuild once the revision-aware reader has been deployed.
 
+### Readings artwork
+
+`src/app/readings/page.tsx` keeps artwork inside the existing 112px thumbnail
+rows with full-width/full-height image boxes and `object-contain`. Images retain
+their aspect ratio without cropping; title spacing and whole-card links stay
+unchanged. The responsive `sizes` expression follows `Container` padding,
+maximum content widths, and the grid's 48px column gaps: one column below 640px,
+two below 1024px (up to 312px each), and four above (up to 220px each).
+Revisit those sizes if the container or grid geometry changes.
+
+For layout verification, check all eight cards at 320, 390, 768, and 1440px in
+light and dark themes. Scroll each image into view and wait for successful image
+decoding before measuring its bounds against the thumbnail row and heading.
+Check for horizontal overflow and verify clicks on the image, title/author, and
+description reach that card's link. Capture the Shannon card at 390px after
+decoding; unloaded-image screenshots can miss the original overlap.
+
 ### Résumé PDF
 
 The homepage's **Download Resume** button serves a PDF through the existing

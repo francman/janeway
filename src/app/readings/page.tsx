@@ -128,7 +128,12 @@ export default function Projects() {
         {books.map((book) => (
           <BookCard as="li" key={book.name}>
             <div className="z-10 flex h-28 w-full items-center justify-center rounded-md bg-white shadow-md shadow-zinc-800/5 ring-1 ring-zinc-900/5 dark:bg-zinc-800 dark:ring-0">
-              <Image src={book.image} alt="" className="rounded-md" />
+              <Image
+                src={book.image}
+                alt=""
+                className="h-full w-full rounded-md object-contain"
+                sizes="(min-width: 1024px) min(220px, calc(25vw - 92px)), (min-width: 640px) min(312px, calc(50vw - 88px)), calc(100vw - 32px)"
+              />
             </div>
             <h2 className="mt-6 text-base font-semibold text-zinc-800 dark:text-zinc-100">
               <BookCard.Link href={book.link.href}>
