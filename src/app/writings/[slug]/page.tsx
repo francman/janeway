@@ -17,9 +17,25 @@ export async function generateMetadata({
   const { slug } = await params
   const article = await getArticleBySlug(slug)
   if (!article) return {}
+  const url = `/writings/${article.slug}`
   return {
     title: article.title,
     description: article.description,
+    authors: [{ name: article.author }],
+    alternates: { canonical: url },
+    openGraph: {
+      title: article.title,
+      description: article.description,
+      url,
+      type: 'article',
+      publishedTime: article.date,
+      authors: [article.author],
+    },
+    twitter: {
+      card: 'summary',
+      title: article.title,
+      description: article.description,
+    },
   }
 }
 

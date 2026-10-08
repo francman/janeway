@@ -5,7 +5,10 @@ import { Layout } from '@/components/Layout'
 
 import '@/styles/tailwind.css'
 
+const siteUrl = 'https://www.frankmanu.com'
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: {
     template: '%s - Frank Manu',
     default: 'Frank Manu',
@@ -25,7 +28,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Frank Kofi Manu',
     description: "Hi, I’m Frank Manu. I'm based in Boston. I build systems.",
-    url: 'https://www.frankmanu.com',
+    url: siteUrl,
     type: 'website',
   },
 }

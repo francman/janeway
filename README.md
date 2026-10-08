@@ -72,6 +72,27 @@ Verify the rendered title and single description tag in both server HTML and
 the browser after direct loads and desktop/mobile menu navigation. Navigate
 between Readings and Projects in both directions to catch stale route metadata.
 
+The root layout sets `metadataBase` to the canonical public origin,
+`https://www.frankmanu.com`, and reuses that origin for homepage Open Graph data.
+`SITE_URL` is the publisher's revalidation destination, not the canonical origin;
+localhost and preview builds intentionally retain public article sharing URLs.
+
+Article `generateMetadata` reuses its existing published article record to emit
+the canonical link, article-specific Open Graph and Twitter title/description,
+`og:type=article`, publication date, and author. Dates are preserved as stored,
+including date-only values. Twitter uses a `summary` card without inventing an
+image. Explicit article sharing fields avoid inheriting homepage identity through
+Next.js metadata merging; no extra content lookup or storage migration is needed.
+
+Verify both published article routes in initial server HTML (for example, with a
+`Twitterbot/1.0` user agent), then through direct and client-side navigation.
+Compare canonical/OG URLs, title, description, author, and publication date with
+their source records; check that returning home restores homepage metadata.
+Use isolated content fixtures to verify unpublished/missing 404s without draft
+metadata, date-only/timestamp values, and escaped title/description characters.
+Rendered HTML checks do not prove when an external social platform refreshes its
+cached preview.
+
 ### Readings artwork
 
 `src/app/readings/page.tsx` renders artwork at the full card width with automatic
