@@ -28,19 +28,6 @@ import { formatDate } from '@/lib/formatDate'
 
 export const dynamic = 'force-dynamic'
 
-function ArrowDownIcon(props: React.ComponentPropsWithoutRef<'svg'>) {
-  return (
-    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true" {...props}>
-      <path
-        d="M4.75 8.75 8 12.25m0 0 3.25-3.5M8 12.25v-8.5"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
 function Article({ article }: { article: ArticleWithSlug }) {
   return (
     <Card as="article">
@@ -154,12 +141,14 @@ function Resume() {
         ))}
       </ol>
       <Button
-        href="https://d343w34l5jqzb2.cloudfront.net/documents/resume/revisions/81f056837083986eeaf7f5dd398e9ae921cfaa000a8e7ba41b8d442d0c72e1e7/frank-manu-resume.pdf"
+        href="https://d343w34l5jqzb2.cloudfront.net/documents/resume/revisions/81f056837083986eeaf7f5dd398e9ae921cfaa000a8e7ba41b8d442d0c72e1e7/inline/frank-manu-resume.pdf"
         variant="secondary"
-        className="group mt-6 w-full"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="mt-6 w-full"
       >
-        Download Resume
-        <ArrowDownIcon className="h-4 w-4 stroke-zinc-400 transition group-active:stroke-zinc-600 dark:group-hover:stroke-zinc-50 dark:group-active:stroke-zinc-50" />
+        Resume
+        <span className="sr-only"> (opens in a new tab)</span>
       </Button>
     </div>
   )

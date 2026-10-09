@@ -266,10 +266,12 @@ decoding; unloaded-image screenshots can miss the original overlap.
 
 ### Résumé PDF
 
-The homepage's **Download Resume** button serves a PDF through the existing
-CloudFront asset distribution, not GitHub Pages. The origin remains private:
-unauthenticated S3 access is denied while the CDN can serve the published PDF.
-No new bucket, database, authentication service, or SSR write permission is needed.
+The homepage's **Resume** link opens the PDF in a new tab through the existing
+CloudFront asset distribution, not GitHub Pages. It uses `target="_blank"` and
+`rel="noopener noreferrer"`, with a screen-reader new-tab notice and no download
+attribute or download icon. The origin remains private: unauthenticated S3
+access is denied while the CDN serves the published PDF. No new bucket,
+database, authentication service, or SSR write permission is needed.
 
 The initial PDF is an unchanged copy of `francman/francman.github.io/resume.pdf`
 at commit `05c3a17be799c1c6645b80ac4e7126a65eccdac6` (July 9, 2025), not a rebuild
@@ -277,33 +279,44 @@ of the separate LaTeX résumé variants. It is 81,057 bytes with SHA-256
 `81f056837083986eeaf7f5dd398e9ae921cfaa000a8e7ba41b8d442d0c72e1e7`.
 The GitHub source/history is retained.
 
-Published keys follow
-`s3://janeway-articles-486207805298-us-east-1/documents/resume/revisions/<sha256>/frank-manu-resume.pdf`.
-The current homepage links directly to that immutable CDN URL.
+The current inline-view delivery key is
+`s3://janeway-articles-486207805298-us-east-1/documents/resume/revisions/<sha256>/inline/frank-manu-resume.pdf`.
+The homepage links directly to that immutable CDN URL. The previous key without
+`/inline/` remains available with its original attachment disposition for old
+links. Both variants contain the same approved bytes; a new delivery key avoids
+reusing cached attachment headers. Never change headers in place on an immutable
+published URL or rely on a query-string suffix to distinguish delivery variants.
 
 To replace the PDF:
 
 1. Obtain the owner-approved PDF and calculate its SHA-256. Do not silently
    substitute an older document or choose a LaTeX role variant.
 2. Upload to its new hash-qualified key using `If-None-Match: *`, never overwrite
-   a published key. Set `Content-Type: application/pdf`,
-   `Content-Disposition: attachment; filename="Frank-Manu-Resume.pdf"`, and
+   a published key. Use the `/inline/` delivery path with `Content-Type: application/pdf`,
+   `Content-Disposition: inline; filename="Frank-Manu-Resume.pdf"`, and
    `Cache-Control: public,max-age=31536000,immutable`. Record source provenance
    and the checksum in object metadata.
 3. Verify CDN HEAD/GET status, headers, and downloaded SHA-256 before changing
    the homepage. Direct unsigned S3 access must still be denied.
-4. Update the `Resume()` button URL in `src/app/page.tsx`. Verify a real browser
-   click/download at desktop and 390px mobile widths. Pushing `deploy` triggers
-   Amplify; verify the public homepage and download after that release.
+4. Update the `Resume()` link URL in `src/app/page.tsx`. Verify a real click and
+   keyboard activation at desktop and 390px mobile widths: homepage stays open,
+   the PDF tab has no opener, and the document renders in the native PDF viewer.
+   Pushing `deploy` triggers Amplify; repeat those checks after the release.
 
 Retain prior immutable PDFs so previously shared URLs remain valid. No CDN
 invalidation or article DynamoDB update is required. Storage, requests, and
 delivery remain usage-based, including retained versions.
 
+Inline disposition requests viewing; it cannot override user download settings,
+managed-browser policies, or a browser without an inline PDF viewer. Those may
+still download the PDF. Verification used Chromium's native PDF viewer at desktop
+and 390px widths; it is not a guarantee about every mobile browser.
+
 [Dashboard issue #11](https://github.com/francman/janeway/issues/11) scopes a future
-Cognito-protected upload workflow and a stable public download route so résumé
-updates no longer require a website deployment. It is not implemented by this
-hosting repair.
+Cognito-protected upload workflow and a stable public résumé route so updates
+no longer require a website deployment. Its publisher must preserve the inline
+headers/delivery-key convention and seed its pointer from the current inline
+object, not the legacy attachment variant. The dashboard is not implemented here.
 
 ## Atomic article publication
 
