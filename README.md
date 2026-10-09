@@ -3,36 +3,81 @@
 Personal website built with Next.js, MDX, Tailwind CSS, and the Tailwind UI
 Spotlight template. Amplify hosts the app; DynamoDB stores article metadata,
 private S3 stores MDX and images, and CloudFront serves article images. AWS
-resources and access policies live in `francman/janeway-infra`.
+resources and access policies live in the
+[companion infrastructure setup and operations guide](https://github.com/francman/janeway-infra#readme).
+Read its source-parity gate before any infrastructure deployment: a clean
+checkout must not deploy until the deployed hardening/role tooling and tracked
+source have been reconciled.
 
 **Deployment boundary:** pushing to `deploy` triggers Amplify production
 deployment. Treat that push as a production change, not a staging step.
 
 ## Setup and verification
 
+Install dependencies and copy the nonsecret template from the repository root:
+
 ```bash
 npm ci
-cp .env.example .env.local
+if test ! -e .env.local; then cp .env.example .env.local; fi
+```
+
+**Configure before starting:** `.env.example` sets
+`ARTICLES_TABLE=janeway-articles`. Consequently, `npm run dev` may call real AWS
+when a page requests content; copying the template does not select an offline
+fixture. Use the intended account/resources and an authorized local SSO profile:
+
+```bash
+aws configure sso --profile janeway-reader # One-time setup with your authorized account/role.
+aws sso login --profile janeway-reader
+export AWS_PROFILE=janeway-reader
+aws sts get-caller-identity --profile "$AWS_PROFILE"
 npm run dev
 ```
 
-Configure these values in `.env.local` and the Amplify server environment:
+Profile names are local examples, not provisioned identities. Renew the SSO
+session when it expires. Do not copy production access-key values into local
+files. For local reading/builds, use least-privileged DynamoDB `Query` on
+`byStatus`, `GetItem` on the intended table, and S3 `GetObject` on article
+objects. Revalidation additionally needs `ssm:GetParameter` on the regional
+secret parameter and applicable KMS decryption permission. Hosted server access
+uses the Amplify compute role, not `AWS_PROFILE`. Normal publication is a
+separate authorized identity: S3 `PutObject`, DynamoDB `GetItem`/`PutItem`,
+and secret lookup permission when using SSM. Do not grant publisher writes to
+the app's read-only compute role; see the infra guide for scoped policies.
 
-| Variable | Purpose |
+| Variable | Local / build / server / publisher / browser role |
 | --- | --- |
-| `AWS_REGION` | Content resource region, currently `us-east-1` |
-| `ARTICLES_BUCKET` | Private article bucket |
-| `ARTICLES_TABLE` | Article metadata table, currently `janeway-articles` |
-| `ARTICLES_IMAGE_CDN_URL` | CloudFront image origin URL |
-| `REVALIDATE_SECRET_PARAM` | SSM SecureString name; defaults to `/janeway/revalidate-secret` |
-| `SITE_URL` | Publisher's revalidation target; use the intended environment |
-| `NEXT_PUBLIC_POSTHOG_KEY` | Optional public analytics key; blank disables analytics |
-| `NEXT_PUBLIC_POSTHOG_HOST` | Public analytics endpoint |
+| `AWS_PROFILE` | Local SDK/CLI identity selector only, including local publishing; not a hosted credential or browser setting |
+| `AWS_REGION` | Local SDK, publisher, and server resource region; defaults to `us-east-1`; server runtime setting, not Next-inlined |
+| `ARTICLES_BUCKET` | Private article bucket; local reader, build-inlined server content configuration, and publisher destination |
+| `ARTICLES_TABLE` | Metadata table; local reader, build-inlined server content configuration, and publisher destination; template defaults to `janeway-articles` |
+| `ARTICLES_IMAGE_CDN_URL` | Public image origin; local rendering and build-inlined image/server configuration |
+| `SITE_URL` | Publisher revalidation target (template: `http://localhost:3000`); also build-inlined, but not the site's canonical sharing origin |
+| `REVALIDATE_SECRET_PARAM` | Server runtime and publisher SSM parameter name; defaults to `/janeway/revalidate-secret` in the selected region; not Next-inlined |
+| `REVALIDATE_SECRET` | Optional publisher-only secret override; otherwise the publisher performs authorized local SSM lookup; the server **never reads this variable** |
+| `NEXT_PUBLIC_POSTHOG_KEY` | Optional, intentionally browser-facing analytics key, inlined by Next; blank disables analytics |
+| `NEXT_PUBLIC_POSTHOG_HOST` | Intentionally browser-facing analytics endpoint, inlined by Next |
 
-Use an authenticated AWS profile locally and the Amplify compute role when
-hosted. Do not embed AWS credentials or the revalidation secret in
-`NEXT_PUBLIC_` variables. The publisher also accepts `REVALIDATE_SECRET` from
-its environment; otherwise it reads the SSM parameter. Never log that value.
+Next loads `.env.local` locally. `next.config.mjs` explicitly inlines exactly
+the four nonsecret values `ARTICLES_BUCKET`, `ARTICLES_TABLE`,
+`ARTICLES_IMAGE_CDN_URL`, and `SITE_URL`. Set them in the Amplify **build**
+environment; changing them requires a new build, not merely a runtime update.
+`AWS_REGION` and `REVALIDATE_SECRET_PARAM` instead use server runtime values or
+the defaults above; Amplify app-level build variables do not automatically
+propagate into compute. The server retrieves the regional SecureString through
+its compute role. Never inline AWS credentials or secret values, log them, or
+put them in `NEXT_PUBLIC_` variables.
+
+There is **no filesystem/offline article fallback**: `content/articles` is
+publisher input, not the site's content store. If `ARTICLES_TABLE` is unset or
+empty, the reader warns and returns an empty listing/null article; deliberately
+setting `ARTICLES_TABLE=` allows an empty-content local shell, not article
+preview. A configured but inaccessible/missing table throws rather than
+silently returning an empty site. Missing metadata or a `DRAFT` item produces
+an article 404. An unset bucket, missing S3 key (`NoSuchKey`/`NotFound`), or
+missing/empty body also produces an article 404, although its metadata may
+still appear in lists. Other S3 failures, such as access denial, propagate.
+Without `ARTICLES_IMAGE_CDN_URL`, relative article images may 404.
 
 ```bash
 npm test
@@ -159,8 +204,11 @@ GitHub Actions runner minutes and artifact storage depend on account allowances.
 - Files beside an article: its images and other uploadable assets.
 - `src/images`: static site images and logos.
 
-Article routes remain `/writings/<slug>`. Publishing content does not require an
-Amplify rebuild once the revision-aware reader has been deployed.
+Article routes remain `/writings/<slug>`. Editing or committing a source file
+does not automatically publish it: the explicit publisher writes AWS content.
+Publishing content does not require an Amplify rebuild once the revision-aware
+reader has been deployed. Conversely, pushing app code to `deploy` starts an
+Amplify build; that is not an article publication.
 
 ### Page metadata
 
@@ -256,11 +304,16 @@ hosting repair.
 
 ## Atomic article publication
 
+Run all commands in this section from the repository root. The intentional
+AWS-writing command, after validation and publication approval, is:
+
 ```bash
-./scripts/publish-article.sh content/articles/<slug>
+./scripts/publish-article.sh 'content/articles/<slug>'
 ```
 
-For publication, the shell entry point loads `.env.local` from the current working directory.
+This is not an `aws s3 sync`: it stages a complete immutable revision and
+conditionally commits its metadata pointer. For publication, the shell entry
+point loads `.env.local` from the current working directory.
 It runs `scripts/lib/publish-article.cjs`, which:
 
 1. Captures the local files once, validates their frontmatter/calendar date,
@@ -287,6 +340,11 @@ reader. A failed draft attempt leaves the previous published body and images
 unchanged. Changing status does not revoke previously rendered pages or public
 image URLs. Raw MDX access remains protected separately by the infra
 CloudFront function and bucket policy; `Cache-Control` is not access control.
+
+`DRAFT` is a visibility flag, **not secret-asset storage**. Publishing a draft
+still uploads its non-hidden assets, which may be publicly retrievable via
+CloudFront if their URLs are known. Never put secrets/private attachments in an
+article directory.
 
 ### Image freshness and cache ownership
 
@@ -333,12 +391,65 @@ Full paths, checksums, measurements, and reproduction steps are tracked in
 
 ### Validate an article without publishing
 
-```bash
-./scripts/publish-article.sh content/articles/penny-trickle-aws-cost-reduction --validate-only
+For a worked example, save the following as
+`/tmp/janeway-doc-example/page.mdx` after creating that directory. It is a
+standalone documentation sample, not a change to any existing article:
+
+```mdx
+---
+title: "Documentation publishing example"
+description: "A safe draft for exercising local article validation."
+author: "Example Author"
+date: "2026-10-08"
+status: DRAFT
+tags: [documentation, example]
+coverImage: cover.png
+---
+
+## Local validation example
+
+This draft demonstrates **Markdown in MDX** without remote dependencies.
+
+- Validate before publishing.
+- Obtain explicit owner approval before changing a real article.
 ```
 
-This runs the same preflight as publication, but requires no AWS credentials,
-bucket/table configuration, or network access and does not load `.env.local`.
+The directory basename supplies the slug (`janeway-doc-example`); use lowercase
+letters/digits with single hyphens between words, not a `slug` frontmatter field.
+`status` accepts `PUBLISHED` or `DRAFT` and defaults to `PUBLISHED` when omitted,
+so keep the explicit safe `DRAFT` above. Optional `tags` (string set) and
+`coverImage` (string) are persisted in DynamoDB, but the typed reader only exposes
+`title`, `description`, `author`, `date`, `slug`, and `s3Key`: tags and cover images
+are not currently surfaced by the UI. The illustrative `cover.png` value is
+metadata, not an image included in this sample; preflight does not check asset
+existence. To render an image, include the actual asset beside `page.mdx` and
+reference it in the MDX body with a relative Markdown image path.
+
+First validate **without publishing**, from the repository root:
+
+```bash
+./scripts/publish-article.sh /tmp/janeway-doc-example --validate-only
+```
+
+Only for an intentionally approved AWS publication, select a publisher
+profile/session, review `.env.local` bucket/table/region and `SITE_URL`, and
+run from the repository root:
+
+The publisher sources `.env.local` as shell configuration: values there can
+override exported or inline assignments, including `AWS_PROFILE` and `SITE_URL`.
+Inspect that file before publishing; do not assume an inline profile wins.
+
+```bash
+AWS_PROFILE=janeway-publisher ./scripts/publish-article.sh /tmp/janeway-doc-example
+```
+
+This second command uploads a real revision and commits a `DRAFT` record; it is
+**not** part of the offline smoke. Do not run it merely to try the example.
+Publishing a visible article requires an owner-reviewed source with
+`status: PUBLISHED` and explicit publication approval.
+
+`--validate-only` runs the same preflight as publication, but requires no AWS
+credentials, bucket/table configuration, or network access and does not load `.env.local`.
 Success prints JSON containing `slug`, `valid`, `publishedAt`, and `status`.
 Failure exits nonzero and identifies the article file and cause. Independent
 frontmatter and MDX failures are reported together when both can be evaluated.
@@ -396,7 +507,7 @@ still incurs ordinary Amplify build/hosting usage.
   commit:
 
 ```bash
-./scripts/publish-article.sh content/articles/<slug> \
+./scripts/publish-article.sh 'content/articles/<slug>' \
   --expected-key 'articles/<slug>/revisions/<original-uuid>/page.mdx'
 # For an article that was originally absent, use --expected-key absent.
 ```
@@ -451,11 +562,14 @@ requests; successive requests during an outage can each retry, although
 concurrent ones coalesce. Any additional SSM/KMS charges depend on the existing
 parameter, throughput, and KMS pricing configuration.
 
-### Legacy migration and production cutover
+### Legacy migration and production cutover (completed history)
 
-The new reader and publisher intentionally reject mutable legacy pointers.
-Do not deploy them against unmigrated metadata. Track rollout in
-[app issue #9](https://github.com/francman/janeway/issues/9).
+The production revision cutover is completed; this is the historical
+procedure/recovery reference, **not a fresh local setup step**. Rollout evidence
+is tracked in [app issue #9](https://github.com/francman/janeway/issues/9).
+The current reader and publisher intentionally reject mutable legacy pointers.
+For a separate environment that still has legacy metadata, review and approve
+its own migration before deploying; do not rerun production migration as setup.
 
 1. Coordinate a freeze of **all** publishers, including older local script
    copies, and keep the freeze until the new reader is live.
