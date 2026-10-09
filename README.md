@@ -198,7 +198,9 @@ GitHub Actions runner minutes and artifact storage depend on account allowances.
 
 - `src/app/page.tsx`: homepage, work history, education, recent writings.
 - `src/app/about/page.tsx`: about page.
-- `src/app/projects/page.tsx`: project cards.
+- `src/app/projects/page.tsx`: projects and community initiatives. Keep the
+  introduction aligned with the linked work; do not promise code contributions
+  when cards link to organizations rather than repositories.
 - `src/app/readings/page.tsx`: books, audiobooks, papers, movies, shows.
 - `src/app/lab233/page.tsx`: tools and home lab notes.
 - `content/articles/<slug>/page.mdx`: article source and YAML frontmatter.
