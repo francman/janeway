@@ -88,6 +88,7 @@ async function startContentStore({
     errors: [],
   }
   const uploadFailures = []
+  const readFailures = []
   const commitFailures = []
   const commitBarriers = []
   const activeBarriers = new Set()
@@ -283,6 +284,7 @@ async function startContentStore({
     state.requests.push(record)
     if (operation === 'PutObject') {
       record.ifNoneMatch = request.headers['if-none-match']
+      record.ifMatch = request.headers['if-match']
       record.contentType = request.headers['content-type']
       record.cacheControl = request.headers['cache-control']
       const failureIndex = uploadFailures.findIndex((failure) => key.endsWith(`/${failure.name}`))
@@ -295,6 +297,17 @@ async function startContentStore({
         record.outcome = 'precondition-failed'
         return s3Error(response, 'PreconditionFailed', 'Object already exists', 412)
       }
+      if (record.ifMatch !== undefined) {
+        const current = state.objects.get(key)
+        if (!current) {
+          record.outcome = 'not-found'
+          return s3Error(response, 'NoSuchKey', 'Object does not exist', 404)
+        }
+        if (record.ifMatch !== '*' && record.ifMatch !== current.etag) {
+          record.outcome = 'precondition-failed'
+          return s3Error(response, 'PreconditionFailed', 'Object ETag does not match', 412)
+        }
+      }
       const object = seedObject(key, decodeUpload(rawBody, request.headers), {
         contentType: record.contentType,
         cacheControl: record.cacheControl,
@@ -304,9 +317,40 @@ async function startContentStore({
       response.end()
       return
     }
+    if (operation === 'GetObject') {
+      if (request.headers.range !== undefined) record.range = request.headers.range
+      const failureIndex = readFailures.findIndex((failure) => failure.key === key)
+      if (failureIndex >= 0) {
+        const [failure] = readFailures.splice(failureIndex, 1)
+        record.outcome = 'error'
+        return s3Error(response, failure.code, failure.message, failure.status)
+      }
+    }
     const versionId = url.searchParams.get('versionId')
     const object = versionId ? state.versions.get(key)?.get(versionId) : state.objects.get(key)
     if (!object) return s3Error(response, 'NoSuchKey', 'Object does not exist', 404)
+    // Only a single explicit byte interval is supported; preserve full reads.
+    if (operation === 'GetObject' && record.range !== undefined) {
+      const match = /^bytes=(\d+)-(\d+)$/.exec(record.range)
+      const start = match ? Number(match[1]) : NaN
+      const requestedEnd = match ? Number(match[2]) : NaN
+      if (!Number.isSafeInteger(start) || !Number.isSafeInteger(requestedEnd) ||
+          start > requestedEnd || start >= object.body.length) {
+        return s3Error(response, 'InvalidRange', 'Requested range is not satisfiable', 416)
+      }
+      const end = Math.min(requestedEnd, object.body.length - 1)
+      const body = object.body.subarray(start, end + 1)
+      response.writeHead(206, {
+        'content-type': object.contentType,
+        'content-length': body.length,
+        'content-range': `bytes ${start}-${end}/${object.body.length}`,
+        etag: object.etag,
+        'x-amz-version-id': object.versionId,
+        ...(object.cacheControl ? { 'cache-control': object.cacheControl } : {}),
+      })
+      response.end(body)
+      return
+    }
     response.writeHead(200, {
       'content-type': object.contentType,
       'content-length': object.body.length,
@@ -388,6 +432,9 @@ async function startContentStore({
     },
     failUpload(name = 'page.mdx', { status = 500, code = 'InternalError' } = {}) {
       uploadFailures.push({ name, status, code })
+    },
+    failRead(key, { status = 500, code = 'InternalError', message = 'Injected read failure' } = {}) {
+      readFailures.push({ key, status, code, message })
     },
     failCommit({ mode = 'error' } = {}) {
       if (!['error', 'conflict', 'ambiguous'].includes(mode)) throw new Error(`Unknown commit failure mode: ${mode}`)

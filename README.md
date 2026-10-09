@@ -266,11 +266,15 @@ decoding; unloaded-image screenshots can miss the original overlap.
 
 ### Résumé PDF
 
-The homepage's **Resume** link opens the PDF in a new tab through the existing
-CloudFront asset distribution, not GitHub Pages. It uses `target="_blank"` and
-`rel="noopener noreferrer"`, with a screen-reader new-tab notice and no download
-attribute or download icon. The origin remains private: unauthenticated S3
-access is denied while the CDN serves the published PDF. No new bucket,
+The homepage's **Resume** link opens `/resume.pdf` in a new tab. This stable route
+reads `documents/resume/current.json` directly from the existing S3 article
+bucket on every request and returns a **307 temporary redirect** to the approved
+immutable PDF on the existing CloudFront asset distribution. Both successful
+redirects and unavailable responses use `Cache-Control: no-store`.
+The link preserves `target="_blank"`, `rel="noopener noreferrer"`, its
+screen-reader new-tab notice, and no download attribute or icon. Next.js
+prefetching is disabled because the destination is a PDF, not an application page.
+The origin remains private: unauthenticated S3 access is denied. No new bucket,
 database, authentication service, or SSR write permission is needed.
 
 The initial PDF is an unchanged copy of `francman/francman.github.io/resume.pdf`
@@ -279,44 +283,99 @@ of the separate LaTeX résumé variants. It is 81,057 bytes with SHA-256
 `81f056837083986eeaf7f5dd398e9ae921cfaa000a8e7ba41b8d442d0c72e1e7`.
 The GitHub source/history is retained.
 
-The current inline-view delivery key is
+The initial inline-view delivery key is
 `s3://janeway-articles-486207805298-us-east-1/documents/resume/revisions/<sha256>/inline/frank-manu-resume.pdf`.
-The homepage links directly to that immutable CDN URL. The previous key without
-`/inline/` remains available with its original attachment disposition for old
-links. Both variants contain the same approved bytes; a new delivery key avoids
-reusing cached attachment headers. Never change headers in place on an immutable
-published URL or rely on a query-string suffix to distinguish delivery variants.
+The previous key without `/inline/` remains available with its original attachment
+disposition for old links. Both variants contain the same approved bytes. Never
+change headers in place on an immutable URL or use a query-string suffix to
+distinguish delivery variants.
 
-To replace the PDF:
+#### Pointer contract
 
-1. Obtain the owner-approved PDF and calculate its SHA-256. Do not silently
-   substitute an older document or choose a LaTeX role variant.
-2. Upload to its new hash-qualified key using `If-None-Match: *`, never overwrite
-   a published key. Use the `/inline/` delivery path with `Content-Type: application/pdf`,
+`src/lib/resume.ts` accepts UTF-8 JSON of at most 4,096 bytes with exactly these
+six fields:
+
+| Field | Required value |
+| --- | --- |
+| `schemaVersion` | Number `1` |
+| `publicationId` | Fresh RFC-variant UUID for each publication, including rollback |
+| `key` | `documents/resume/revisions/<sha256>/inline/frank-manu-resume.pdf` |
+| `sha256` | 64 lowercase hexadecimal characters matching the key |
+| `bytes` | Positive safe integer: the verified PDF's byte count |
+| `publishedAt` | Valid UTC ISO timestamp with seconds or three-digit milliseconds |
+
+The reader uses `ARTICLES_BUCKET` and the existing `ARTICLES_IMAGE_CDN_URL`.
+The latter must be an HTTPS origin, optionally ending in `/`, without credentials,
+another path, query, or fragment. The pointer cannot supply an arbitrary URL.
+Caller query parameters and headers do not select the destination. There is no
+Next.js/React pointer cache, PDF HEAD request, or PDF download on this read path.
+The publisher must verify the PDF **before** changing the pointer.
+
+Missing/malformed/oversized pointers, invalid configuration, or S3 read failures
+return **503**, no redirect, and a generic error without storage details. There
+is deliberately no silent fallback to a potentially obsolete résumé.
+
+#### Publishing or recovering a résumé
+
+1. Obtain the owner-approved PDF and calculate its SHA-256 and byte count. Do not
+   silently substitute an older document or choose a LaTeX role variant.
+2. Upload to its new hash-qualified key with `If-None-Match: *`; never overwrite a
+   published key. Use the `/inline/` delivery path, `Content-Type: application/pdf`,
    `Content-Disposition: inline; filename="Frank-Manu-Resume.pdf"`, and
    `Cache-Control: public,max-age=31536000,immutable`. Record source provenance
-   and the checksum in object metadata.
-3. Verify CDN HEAD/GET status, headers, and downloaded SHA-256 before changing
-   the homepage. Direct unsigned S3 access must still be denied.
-4. Update the `Resume()` link URL in `src/app/page.tsx`. Verify a real click and
-   keyboard activation at desktop and 390px mobile widths: homepage stays open,
-   the PDF tab has no opener, and the document renders in the native PDF viewer.
-   Pushing `deploy` triggers Amplify; repeat those checks after the release.
+   and checksum in object metadata.
+3. Verify CDN HEAD/GET status, headers, and downloaded SHA-256 and byte count.
+   Direct unsigned S3 access must remain denied. Retain prior immutable PDFs.
+4. Read the current pointer directly from S3 and retain its exact opaque ETag.
+   Prepare a reviewed JSON file using the contract above, a **new** publication
+   UUID and current UTC timestamp. The initial seed references the already
+   verified inline PDF above; it does not re-upload or alter the document.
+5. Write the pointer conditionally. For an existing pointer:
 
-Retain prior immutable PDFs so previously shared URLs remain valid. No CDN
-invalidation or article DynamoDB update is required. Storage, requests, and
-delivery remain usage-based, including retained versions.
+   ```sh
+   aws s3api put-object \
+     --profile AdministratorAccess-486207805298 --region us-east-1 \
+     --bucket janeway-articles-486207805298-us-east-1 \
+     --key documents/resume/current.json \
+     --body /absolute/path/reviewed-pointer.json \
+     --if-match "$REVIEWED_ETAG" \
+     --content-type application/json --cache-control no-store \
+     --server-side-encryption AES256
+   ```
+
+   `REVIEWED_ETAG` must contain the exact ETag returned by the reviewed S3 read,
+   including its quotes. For an initial seed only, replace `--if-match` with
+   `--if-none-match '*'`. Never use an unconditional overwrite.
+6. Record the returned ETag and VersionId, then read back and compare the pointer.
+   Verify `/resume.pdf` returns 307 with `no-store` and the expected CDN Location.
+   Exercise the homepage link and keyboard activation at desktop and 390px:
+   the original page stays open, the new tab has no opener, and the PDF renders.
+
+A 412 conflict means another write won: re-read and review rather than blindly
+retry. After a timeout or otherwise unknown write outcome, read the current
+`publicationId` before deciding whether another write is appropriate. Rollback
+means publishing a pointer to a retained, verified PDF with a **fresh** UUID and
+the current ETag; do not restore old pointer bytes or delete the pointer first.
+Fresh publication IDs also prevent an old A→B→A body/ETag from authorizing a stale
+writer. S3 versioning preserves pointer history.
+
+After this route's initial deployment, résumé replacement needs **no app rebuild,
+CDN invalidation, article revalidation, or DynamoDB update**. Already-open PDF
+tabs keep their immutable revision; opening the stable link again resolves the
+current pointer. The pointer contains public document metadata only, not secrets.
+Each stable-link request adds a small S3 read and existing Amplify SSR work;
+JSON/version storage, requests, builds, and PDF delivery remain usage-based.
 
 Inline disposition requests viewing; it cannot override user download settings,
 managed-browser policies, or a browser without an inline PDF viewer. Those may
 still download the PDF. Verification used Chromium's native PDF viewer at desktop
 and 390px widths; it is not a guarantee about every mobile browser.
 
-[Dashboard issue #11](https://github.com/francman/janeway/issues/11) scopes a future
-Cognito-protected upload workflow and a stable public résumé route so updates
-no longer require a website deployment. Its publisher must preserve the inline
-headers/delivery-key convention and seed its pointer from the current inline
-object, not the legacy attachment variant. The dashboard is not implemented here.
+[Dashboard issue #11](https://github.com/francman/janeway/issues/11) scopes the
+future Cognito-protected upload workflow. Its publisher must preserve this
+pointer contract, conditional-write rules, verified-before-publish ordering, and
+inline headers/delivery-key convention. The stable public route is implemented;
+dashboard authentication, upload, and publication controls are separate work.
 
 ## Atomic article publication
 
