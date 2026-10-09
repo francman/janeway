@@ -4,9 +4,9 @@ import { FaBriefcase } from 'react-icons/fa'
 import Link from 'next/link'
 import clsx from 'clsx'
 
-import { Button } from '@/components/Button'
+import { Button } from '@janeway/ui/button'
 import { Card } from '@/components/Card'
-import { Container } from '@/components/Container'
+import { Container } from '@janeway/ui/container'
 import {
   GitHubIcon,
   InstagramIcon,

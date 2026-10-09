@@ -22,6 +22,7 @@ const inlinedEnv = Object.fromEntries(
 )
 
 const nextConfig = {
+  transpilePackages: ['@janeway/ui'],
   pageExtensions: ['js', 'jsx', 'ts', 'tsx'],
   env: inlinedEnv,
   images: {

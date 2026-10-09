@@ -1,0 +1,89 @@
+name: Deploy owner dashboard
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: janeway-admin-production
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      NEXT_PUBLIC_ADMIN_ORIGIN: https://frank.frankmanu.com
+      NEXT_PUBLIC_COGNITO_AUTHORITY: ${{ vars.ADMIN_COGNITO_AUTHORITY }}
+      NEXT_PUBLIC_COGNITO_CLIENT_ID: ${{ vars.ADMIN_COGNITO_CLIENT_ID }}
+      NEXT_PUBLIC_COGNITO_DOMAIN: ${{ vars.ADMIN_COGNITO_DOMAIN }}
+      NEXT_PUBLIC_ADMIN_API_URL: ${{ vars.ADMIN_API_URL }}
+    steps:
+      - name: Require the reviewed admin branch
+        run: test "$GITHUB_REF" = refs/heads/admin-deploy
+      - name: Check out the selected commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1, Node 24
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0, Node 24
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies without cloud credentials
+        run: npm ci
+      - name: Verify session boundaries and build static admin
+        run: npm run test:admin && npm run build:admin
+      - name: Package the exact release and its security headers
+        run: node scripts/prepare-admin-release.cjs
+      - name: Preserve the reviewed static artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2, Node 24
+        with:
+          name: admin-release-${{ github.sha }}
+          path: out/admin-release/
+          if-no-files-found: error
+          retention-days: 14
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment:
+      name: admin-production
+      url: https://frank.frankmanu.com
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      ADMIN_AMPLIFY_APP_ID: ${{ vars.ADMIN_AMPLIFY_APP_ID }}
+    steps:
+      - name: Check out the approved deployment runner
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1, Node 24
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0, Node 24
+        with:
+          node-version: '22'
+      - name: Download only this run's reviewed artifact
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2, Node 24
+        with:
+          name: admin-release-${{ github.sha }}
+          path: out/admin-release/
+      - name: Obtain short-lived deployment-only credentials
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0, Node 24
+        with:
+          role-to-assume: ${{ vars.ADMIN_DEPLOY_ROLE_ARN }}
+          role-session-name: janeway-admin-${{ github.run_id }}
+          aws-region: us-east-1
+          allowed-account-ids: '486207805298'
+      - name: Upload static artifacts and observe deployment completion
+        run: node scripts/deploy-admin.cjs
+      - name: Verify anonymous hosting and the API boundary
+        env:
+          ADMIN_API_URL: ${{ vars.ADMIN_API_URL }}
+        run: node scripts/smoke-admin-public.cjs

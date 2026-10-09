@@ -1,6 +1,6 @@
-import { Button } from '@/components/Button'
+import { Button } from '@janeway/ui/button'
 import Image, { type ImageProps } from 'next/image'
-import { Container } from '@/components/Container'
+import { Container } from '@janeway/ui/container'
 import image404 from '@/images/photos/image-404.jpg'
 export default function NotFound() {
   return (

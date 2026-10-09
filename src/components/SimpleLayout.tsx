@@ -1,4 +1,4 @@
-import { Container } from '@/components/Container'
+import { Container } from '@janeway/ui/container'
 
 export function SimpleLayout({
   title,

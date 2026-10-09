@@ -2,6 +2,7 @@
   "name": "francman",
   "version": "0.1.0",
   "private": true,
+  "workspaces": ["apps/admin", "packages/ui"],
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -9,7 +10,10 @@
     "lint": "eslint . --ext .js,.jsx,.mjs,.ts,.tsx",
     "test": "node --test test/*.test.cjs",
     "test:release-smoke": "node --test test/release-smoke/*.test.cjs",
-    "smoke:release": "node scripts/release-smoke.cjs"
+    "smoke:release": "node scripts/release-smoke.cjs",
+    "dev:admin": "npm run dev --workspace @janeway/admin",
+    "build:admin": "npm run build --workspace @janeway/admin",
+    "test:admin": "npm run test --workspace @janeway/admin"
   },
   "browserslist": "defaults, not ie <= 11",
   "dependencies": {

@@ -1,0 +1,15 @@
+{
+  "name": "@janeway/ui",
+  "version": "0.1.0",
+  "private": true,
+  "exports": {
+    "./button": "./src/button.tsx",
+    "./container": "./src/container.tsx",
+    "./tokens": "./src/tokens.ts"
+  },
+  "peerDependencies": {
+    "clsx": "^1.2.1",
+    "next": "^15.0.4",
+    "react": "^19.2.7"
+  }
+}

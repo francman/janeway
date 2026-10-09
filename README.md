@@ -194,6 +194,93 @@ evidence. The default `npm test` remains browser-free. CI installs Chromium with
 No new AWS resources are needed. Normal public request/transfer costs apply;
 GitHub Actions runner minutes and artifact storage depend on account allowances.
 
+## Owner dashboard
+
+`apps/admin` is the separate **read-only** owner workspace for
+`https://frank.frankmanu.com`. It uses the approved compact sidebar/topbar,
+light/dark theme and mobile drawer. Résumé metadata comes from the authenticated
+API; the public PDF action uses `/resume.pdf` on the public website. Writings and
+Metrics explicitly report that their capabilities are not available/connected:
+there are no upload, editor, publication or fabricated analytics controls.
+Their implementation remains in the separate children of
+[dashboard epic #11](https://github.com/francman/janeway/issues/11).
+
+The public app remains in `src/app`, with its existing `amplify.yml`, `deploy`
+branch and SSR permissions. `packages/ui` is a private workspace containing the
+shared Button, Container and font-size tokens; consumers import its direct
+subpaths. Public TypeScript/Tailwind discovery excludes admin artifacts.
+The dashboard does not import the portfolio shell or public PostHog provider.
+
+### Authentication and privacy
+
+- Cognito `janewayUsers` / `janewayDashboard` manages passwords and required TOTP.
+  No custom password form, self-registration, client secret or IAM browser keys.
+- `oidc-client-ts` performs authorization code + S256 PKCE with state and nonce.
+  The client requests a fresh managed sign-in (`prompt=login`); callback
+  code/state are removed from browser history before token exchange/API reads.
+- Only the temporary, single-use PKCE transaction is in sessionStorage, expiring
+  after ten minutes. Access/ID/rotating-refresh tokens and owner data stay in
+  memory. Only the nonsecret theme preference uses localStorage.
+- Five-minute access tokens refresh serially within an eight-hour authentication
+  ceiling. Reload starts a new code flow. Sign-out clears local data, attempts
+  refresh-family revocation, and clears Cognito's separate cookie through its
+  logout endpoint. Already-issued JWTs can remain usable until expiry; neither
+  logout nor MFA reset promises immediate offline JWT revocation.
+- Owner access requires the backend's exact immutable subject and activation
+  authentication-time floor, not an email, frontend route, CORS or scope alone.
+  Enrollment remains denied until an operator verifies TOTP, revokes bootstrap
+  sessions and activates that subject. Earlier `auth_time` values stay denied.
+- Session expiry/denial clears the read-only workspace. API unavailability hides
+  stale metadata and offers explicit retry. Late responses/refreshes cannot
+  restore cleared data. The signed-out landing never automatically signs in.
+
+Static JS/HTML is public, including the default Amplify hostname; authorization
+protects private API responses. The app rejects noncanonical runtime origins.
+API Gateway validates signatures/issuer/client/scope; Lambda additionally checks
+access-token type, expiry, owner and activation. Native Gateway rejections use
+AWS's own error response; integration responses use the documented sanitized
+error envelope and `no-store`. No tokens, signed URLs or private content belong
+in build variables, logs, analytics or release artifacts.
+
+### Build and release
+
+Install from the root with `npm ci`; there is one lockfile. `npm run test:admin`
+exercises session/security behavior; `npm run build:admin` exports
+`apps/admin/out`. Public build/lint/tests remain separate. `npm run dev:admin`
+starts development, but the production client has **no localhost callback**.
+Local authentication verification uses an isolated provider/API rehearsal;
+a real development identity environment requires separate approval/configuration.
+
+The five public build settings are `NEXT_PUBLIC_ADMIN_ORIGIN`,
+`NEXT_PUBLIC_COGNITO_AUTHORITY`, `NEXT_PUBLIC_COGNITO_CLIENT_ID`,
+`NEXT_PUBLIC_COGNITO_DOMAIN` and `NEXT_PUBLIC_ADMIN_API_URL`. Their production
+values come from `JanewayAdminStack` outputs; never embed owner IDs or tokens.
+
+Admin releases use **Actions → Deploy owner dashboard**, manually dispatched
+from **`admin-deploy`**. Its build job has no cloud credentials/OIDC permission.
+The `admin-production` deployment environment permits only that branch, requires
+Frank's review, and disallows admin bypass. The OIDC role can create/start/read
+deployments only for the separate `janeway-admin` app's `production` branch.
+It cannot change infrastructure, Cognito or content.
+
+`scripts/prepare-admin-release.cjs` packages the exact static export and records
+its commit/digest. It supplies `customHttp.yml` with build-specific inline-script
+hashes, no framing/referrer leakage, and narrowly scoped connections.
+Do not add `unsafe-inline`/`unsafe-eval` to script policy to fix a broken build.
+`scripts/deploy-admin.cjs` verifies the selected commit/artifact/account/role,
+uploads without logging its signed URL, and observes the Amplify job.
+`scripts/smoke-admin-public.cjs` verifies real route delivery, hydration hashes,
+anonymous/invalid-token denial and exact-origin CORS. Owner sign-in/MFA,
+desktop/mobile interactions and public-site regression smoke are additional
+acceptance gates, not claims made by a successful upload alone.
+
+Changes to shared/public code still require a public `deploy`-branch release.
+Do not point the public app at the admin export or give the admin deployment role
+public-site permissions. Restore a reviewed admin source commit through the same
+protected workflow; do not change the owner subject or résumé pointer to roll
+back a UI release. Owner enrollment/recovery commands and resource/cost inventory
+are in `janeway-infra`'s **Owner dashboard operations** section.
+
 ## Content
 
 - `src/app/page.tsx`: homepage, work history, education, recent writings.
