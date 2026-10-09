@@ -14,8 +14,13 @@ async function aws(args) {
   try {
     const { stdout } = await run('aws', [...args, '--region', 'us-east-1', '--output', 'json'], { maxBuffer: 1024 * 1024 })
     return JSON.parse(stdout)
-  } catch {
-    throw new Error(`AWS ${args[0]} ${args[1]} failed; inspect deployment state before retrying`)
+  } catch (error) {
+    const code = error.stderr?.match(/An error occurred \(([A-Za-z0-9]+)\)/)?.[1] || 'COMMAND_FAILED'
+    const detail = (error.stderr?.match(/\) when calling the [A-Za-z0-9]+ operation: ([^\r\n]*)/)?.[1] || '')
+      .replace(/https?:\/\/\S+/g, '[URL omitted]')
+      .replace(/\b(?:AKIA|ASIA)[A-Z0-9]{16}\b/g, '[credential identifier omitted]')
+      .slice(0, 1000)
+    throw new Error(`AWS ${args[0]} ${args[1]} failed (${code})${detail ? ': ' + detail : ''}; inspect deployment state before retrying`)
   }
 }
 async function main() {
