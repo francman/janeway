@@ -5,9 +5,10 @@ Spotlight template. Amplify hosts the app; DynamoDB stores article metadata,
 private S3 stores MDX and images, and CloudFront serves article images. AWS
 resources and access policies live in the
 [companion infrastructure setup and operations guide](https://github.com/francman/janeway-infra#readme).
-Read its source-parity gate before any infrastructure deployment: a clean
-checkout must not deploy until the deployed hardening/role tooling and tracked
-source have been reconciled.
+Infrastructure source reconciliation was verified on 2026-10-09; see its
+[deployment gate](https://github.com/francman/janeway-infra#source-reconciliation-and-deployment-gate).
+Future infrastructure changes still require a fresh read-only diff and explicit
+deployment approval; do not repeat the completed role adoption.
 
 **Deployment boundary:** pushing to `deploy` triggers Amplify production
 deployment. Treat that push as a production change, not a staging step.
