@@ -27,7 +27,12 @@ async function main() {
     }
     console.log(JSON.stringify({ route, status: response.status, securityHeaders: 'passed' }))
   }
-  for (const [method, route] of [['GET', '/v1/session'], ['GET', '/v1/resume'], ['DELETE', '/v1/device']]) {
+  for (const [method, route] of [
+    ['GET', '/v1/session'], ['GET', '/v1/resume'], ['DELETE', '/v1/device'],
+    ['POST', '/v1/resume/uploads'],
+    ['POST', '/v1/resume/uploads/13cfb5e9-7e06-4b92-8524-f0c6ba5f0ad1/validate'],
+    ['GET', '/v1/resume/validations/54c69aa4-ae81-4a91-a5d0-e16b4765e20c/preview'],
+  ]) {
     for (const authorization of [undefined, 'Bearer invalid']) {
       const response = await fetch(api + route, { method, headers: authorization ? { Authorization: authorization } : {}, redirect: 'manual' })
       assert.equal(response.status, 401, `${route} must reject ${authorization ? 'invalid' : 'missing'} authentication`)

@@ -205,8 +205,9 @@ The footer has no status slogan: its separator and name sit at the bottom of
 short pages and follow the content on longer pages, without overlaying controls.
 Résumé metadata comes from the authenticated
 API; the public PDF action uses `/resume.pdf` on the public website. Writings and
-Metrics explicitly report that their capabilities are not available/connected:
-there are no upload, editor, publication or fabricated analytics controls.
+Metrics explicitly report that their capabilities are not available/connected.
+The résumé uploader stages and validates a private PDF without publishing it;
+there are no editor, publication or fabricated analytics controls.
 Their implementation remains in the separate children of
 [dashboard epic #11](https://github.com/francman/janeway/issues/11).
 
@@ -215,6 +216,34 @@ branch and SSR permissions. `packages/ui` is a private workspace containing the
 shared Button, Container and font-size tokens; consumers import its direct
 subpaths. Public TypeScript/Tailwind discovery excludes admin artifacts.
 The dashboard does not import the portfolio shell or public PostHog provider.
+
+### Private résumé upload and preview
+
+The résumé workspace supports selecting an unencrypted PDF up to 10 MiB,
+local browser preview, direct private S3 upload with progress, pinned-version
+server validation and private preview of the exact validated version.
+No step changes the public résumé or displays a Published result.
+
+The server grants an exact owner/key/content-type/byte-count POST capability
+for five minutes. The browser must receive `x-amz-version-id` and send that
+version to validation; never infer latest after an interrupted/unknown transfer.
+Receipt validity is one hour, while signed preview access lasts at most five
+minutes. Staging objects/receipts expire after seven days, with noncurrent
+versions after one day. Retention/deletion is asynchronous.
+
+Blob URLs, grants and receipts are tab-only state and are cleared on
+replacement, logout/unmount and expiry. Preview signed URLs are bearer
+capabilities, not public CDN URLs; never send them to analytics/logs or persist
+them. Previously issued preview links can still work until their expiry after
+logout. Validation is size/signature/encryption/parse/page/checksum checking,
+not malware scanning.
+
+The release CSP permits only the exact private regional S3 staging origin for
+direct transfers and PDF frames, plus local blob PDF frames. Keep the origin
+allowlist narrow; do not add wildcard S3 hosts, scripts or public staging grants
+to make a preview work. Native PDF viewing depends on browser support/settings.
+The operator and version/recovery contracts are in janeway-infra's runbook;
+[infra #8](https://github.com/francman/janeway-infra/issues/8) records rollout proof.
 
 ### Authentication and privacy
 
@@ -281,9 +310,10 @@ the production API's exact CORS boundary prevents it from opening private data.
 Do not enter production credentials there. A functioning development identity/API
 environment requires separate reviewed resources and configuration.
 
-The five public build settings are `NEXT_PUBLIC_ADMIN_ORIGIN`,
+The six public build settings are `NEXT_PUBLIC_ADMIN_ORIGIN`,
 `NEXT_PUBLIC_COGNITO_AUTHORITY`, `NEXT_PUBLIC_COGNITO_CLIENT_ID`,
-`NEXT_PUBLIC_COGNITO_LOGIN_ID` and `NEXT_PUBLIC_ADMIN_API_URL`.
+`NEXT_PUBLIC_COGNITO_LOGIN_ID`, `NEXT_PUBLIC_ADMIN_API_URL` and
+`NEXT_PUBLIC_RESUME_PREVIEW_ORIGIN` (the exact private regional staging origin).
 The fixed login ID is the owner's public email alias; the form asks only for the
 password. Pool/client/API values come from `JanewayAdminStack`; never embed the
 immutable owner subject or tokens. Native authentication connects to the regional

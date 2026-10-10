@@ -1,6 +1,12 @@
 import { ApiError, ownerRequest, parseResume, parseSession, type DeviceErrorCode, type OwnerSession, type ResumeMetadata } from './api'
 import type { AdminConfig } from './config'
 import { AuthFailure, authFailure, type AuthErrorCode, type AuthPort, type AuthStep, type AuthUser } from './auth'
+import {
+  authorizeResumeUpload as requestUploadAuthorization,
+  getResumePreview as requestResumePreview,
+  validateResumeUpload as requestResumeValidation,
+  type PreviewGrant, type UploadAuthorization, type ValidationReceipt,
+} from './resume-upload'
 
 export type SessionStatus = 'login' | 'verifying' | 'authenticated' | 'signing-out' | 'expired' | 'denied' | 'unavailable' | 'error'
 export interface SessionSnapshot {
@@ -39,6 +45,7 @@ export class OwnerSessionClient {
   private readonly requests = new Set<AbortController>()
 
   readonly loginId: string
+  readonly stagingOrigin: string
   constructor(
     private readonly config: AdminConfig,
     private readonly auth: AuthPort,
@@ -46,6 +53,7 @@ export class OwnerSessionClient {
     private readonly now = () => Math.floor(Date.now() / 1000),
   ) {
     this.loginId = config.loginId
+    this.stagingOrigin = config.previewOrigin
   }
 
   getSnapshot = (): SessionSnapshot => this.snapshot
@@ -188,6 +196,39 @@ export class OwnerSessionClient {
       clearTimeout(timeout)
       this.requests.delete(controller)
     }
+  }
+
+  private async uploadOperation<T>(operation: (token: string, signal: AbortSignal, ownerSub: string) => Promise<T>, callerSignal?: AbortSignal): Promise<T> {
+    const generation = this.generation
+    const token = await this.accessToken()
+    if (generation !== this.generation || !this.user || callerSignal?.aborted) throw new ApiError('expired')
+    const ownerSub = this.user.sub
+    const controller = new AbortController()
+    this.requests.add(controller)
+    const cancel = () => controller.abort()
+    callerSignal?.addEventListener('abort', cancel, { once: true })
+    const timeout = setTimeout(() => controller.abort(), 30_000)
+    try {
+      const value = await operation(token, controller.signal, ownerSub)
+      if (generation !== this.generation || !this.user || this.now() >= Math.min(this.deadline, this.user.expiresAt)) throw new ApiError('expired')
+      return value
+    } catch (error) {
+      if (generation === this.generation && error instanceof ApiError && error.kind !== 'unavailable') this.reject(error)
+      throw error
+    } finally {
+      clearTimeout(timeout)
+      callerSignal?.removeEventListener('abort', cancel)
+      this.requests.delete(controller)
+    }
+  }
+  authorizeResumeUpload(file: File, callerSignal?: AbortSignal): Promise<UploadAuthorization> {
+    return this.uploadOperation((token, signal, ownerSub) => requestUploadAuthorization(this.config.apiUrl, this.config.previewOrigin, ownerSub, token, file, signal, this.transport), callerSignal)
+  }
+  validateResumeUpload(uploadId: string, versionId: string, callerSignal?: AbortSignal): Promise<ValidationReceipt> {
+    return this.uploadOperation((token, signal, ownerSub) => requestResumeValidation(this.config.apiUrl, ownerSub, token, uploadId, versionId, signal, this.transport), callerSignal)
+  }
+  getResumePreview(receipt: ValidationReceipt, callerSignal?: AbortSignal): Promise<PreviewGrant> {
+    return this.uploadOperation((token, signal, ownerSub) => requestResumePreview(this.config.apiUrl, this.config.previewOrigin, ownerSub, token, receipt, signal, this.transport), callerSignal)
   }
 
   checkSession = (): Promise<void> => {

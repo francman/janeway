@@ -5,6 +5,7 @@ export interface AdminConfig {
   loginId: string
   poolId: string
   apiUrl: string
+  previewOrigin: string
 }
 
 function httpsOrigin(value: string | undefined, allowLoopback = false): string {
@@ -21,6 +22,7 @@ function httpsOrigin(value: string | undefined, allowLoopback = false): string {
 export function readAdminConfig(): AdminConfig {
   const origin = httpsOrigin(process.env.NEXT_PUBLIC_ADMIN_ORIGIN, true)
   const apiUrl = httpsOrigin(process.env.NEXT_PUBLIC_ADMIN_API_URL)
+  const previewOrigin = httpsOrigin(process.env.NEXT_PUBLIC_RESUME_PREVIEW_ORIGIN)
   const authority = process.env.NEXT_PUBLIC_COGNITO_AUTHORITY
   const clientId = process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID
   const loginId = process.env.NEXT_PUBLIC_COGNITO_LOGIN_ID
@@ -29,7 +31,8 @@ export function readAdminConfig(): AdminConfig {
     !clientId || !/^[a-z0-9]{1,128}$/.test(clientId) ||
     !loginId || loginId !== loginId.trim().toLowerCase() || loginId.length > 128 ||
     !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginId) ||
-    !/^https:\/\/[a-z0-9]+\.execute-api\.us-east-1\.amazonaws\.com$/.test(apiUrl)
+    !/^https:\/\/[a-z0-9]+\.execute-api\.us-east-1\.amazonaws\.com$/.test(apiUrl) ||
+    !/^https:\/\/janeway-resume-staging-\d{12}-us-east-1\.s3\.us-east-1\.amazonaws\.com$/.test(previewOrigin)
   ) throw new Error('Invalid public configuration')
-  return { origin, authority, clientId, loginId, poolId: authority.slice(authority.lastIndexOf('/') + 1), apiUrl }
+  return { origin, authority, clientId, loginId, poolId: authority.slice(authority.lastIndexOf('/') + 1), apiUrl, previewOrigin }
 }

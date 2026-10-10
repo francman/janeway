@@ -20,6 +20,7 @@ jobs:
       NEXT_PUBLIC_COGNITO_CLIENT_ID: ${{ vars.ADMIN_COGNITO_CLIENT_ID }}
       NEXT_PUBLIC_COGNITO_LOGIN_ID: ${{ vars.ADMIN_COGNITO_LOGIN_ID }}
       NEXT_PUBLIC_ADMIN_API_URL: ${{ vars.ADMIN_API_URL }}
+      NEXT_PUBLIC_RESUME_PREVIEW_ORIGIN: ${{ vars.ADMIN_RESUME_PREVIEW_ORIGIN }}
     steps:
       - name: Require the reviewed admin branch
         run: test "$GITHUB_REF" = refs/heads/admin-deploy

@@ -5,6 +5,7 @@ import { Button } from '@janeway/ui/button'
 import { Icon } from './icon'
 import { Workspace } from './workspace'
 import { useOwnerSession } from './session-provider'
+import { ResumeUploader } from './resume-uploader'
 
 export function ResumeWorkspace() {
   const { snapshot, client } = useOwnerSession()
@@ -36,9 +37,10 @@ export function ResumeWorkspace() {
             <div><dt className="font-medium">Published at (UTC)</dt><dd className="mt-1 break-all font-mono text-xs text-zinc-600 dark:text-zinc-400"><time dateTime={resume.publishedAt}>{resume.publishedAt}</time></dd></div>
             <div><dt className="font-medium">Publication pointer ETag</dt><dd className="mt-1 break-all font-mono text-xs text-zinc-600 dark:text-zinc-400">{resume.etag}</dd></div>
           </dl>
-          <div className="mt-6 flex items-start gap-3 rounded-lg bg-teal-50 p-4 text-sm text-teal-900 dark:bg-teal-950/50 dark:text-teal-200"><Icon name="lock" className="mt-0.5 h-5 w-5 shrink-0" /><p>Uploads, replacement, and publication are not available here yet.</p></div>
+          <div className="mt-6 flex items-start gap-3 rounded-lg bg-teal-50 p-4 text-sm text-teal-900 dark:bg-teal-950/50 dark:text-teal-200"><Icon name="lock" className="mt-0.5 h-5 w-5 shrink-0" /><p>Private uploads below do not replace this published résumé. Publication is not available yet.</p></div>
         </section>
       </div>}
     </div>
+    {snapshot.status === 'authenticated' && client && <ResumeUploader client={client} />}
   </Workspace>
 }

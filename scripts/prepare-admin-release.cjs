@@ -13,11 +13,13 @@ const revision = process.env.GITHUB_SHA || process.env.ADMIN_REVISION
 if (!/^[a-f0-9]{40}$/.test(revision || '')) throw new Error('Set ADMIN_REVISION to the reviewed full commit before packaging')
 const origin = process.env.NEXT_PUBLIC_ADMIN_ORIGIN
 if (origin !== 'https://frank.frankmanu.com') throw new Error('Production admin origin must be canonical')
-const connections = ['NEXT_PUBLIC_COGNITO_AUTHORITY', 'NEXT_PUBLIC_ADMIN_API_URL'].map(name => {
+const connectionNames = ['NEXT_PUBLIC_COGNITO_AUTHORITY', 'NEXT_PUBLIC_ADMIN_API_URL', 'NEXT_PUBLIC_RESUME_PREVIEW_ORIGIN']
+const connectionUrls = Object.fromEntries(connectionNames.map(name => {
   const url = new URL(process.env[name] || '')
-  if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) throw new Error(`Invalid ${name}`)
-  return url.origin
-})
+  if (url.protocol !== 'https:' || url.username || url.password || url.pathname !== '/' || url.search || url.hash) throw new Error(`Invalid ${name}`)
+  return [name, url.origin]
+}))
+const connections = Object.values(connectionUrls)
 const hashes = new Set()
 let htmlFiles = 0
 function inspect(directory) {
@@ -46,7 +48,7 @@ const csp = [
   "font-src 'self'",
   `connect-src 'self' ${[...new Set(connections)].join(' ')}`,
   "object-src 'none'",
-  "frame-src 'none'",
+  `frame-src 'self' blob: ${connectionUrls.NEXT_PUBLIC_RESUME_PREVIEW_ORIGIN}`,
   "frame-ancestors 'none'",
   "base-uri 'none'",
   "form-action 'self'",
