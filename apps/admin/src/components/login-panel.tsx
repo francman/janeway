@@ -53,7 +53,7 @@ export function LoginPanel() {
   const credentials = flow.kind === 'credentials'
   const newPassword = flow.kind === 'new-password'
   const code = flow.kind === 'totp'
-  const titles = { credentials: 'Sign in', 'new-password': 'Choose your password', totp: flow.secret ? 'Set up your authenticator' : 'Verify it is you' }
+  const title = credentials ? 'Sign in' : newPassword ? 'Choose your password' : flow.secret ? 'Set up your authenticator' : 'Verify it is you'
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -81,7 +81,7 @@ export function LoginPanel() {
 
   return <section className="panel mx-auto mt-4 max-w-lg sm:mt-8" aria-busy={snapshot.authBusy}>
     <div className="flex justify-center"><ThemeToggle /></div>
-    {credentials ? <h1 className="sr-only">Sign in</h1> : <h1 className="mt-5 text-2xl font-semibold tracking-tight">{titles[flow.kind]}</h1>}
+    {credentials ? <h1 className="sr-only">Sign in</h1> : <h1 className="mt-5 text-2xl font-semibold tracking-tight">{title}</h1>}
     {snapshot.status === 'verifying' && <p role="status" className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">Checking your session…</p>}
     {!credentials && <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">{flow.kind === 'new-password' ? 'Replace your temporary password to continue enrollment.' : 'Enter a fresh six-digit code from your authenticator app.'}</p>}
     {(formError || snapshot.authError) && <p role="alert" className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">{formError || (snapshot.authError && errors[snapshot.authError])}</p>}
