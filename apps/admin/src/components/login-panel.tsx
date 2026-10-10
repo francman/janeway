@@ -81,16 +81,16 @@ export function LoginPanel() {
 
   return <section className="panel mx-auto mt-4 max-w-lg sm:mt-8" aria-busy={snapshot.authBusy}>
     <div className="flex justify-center"><ThemeToggle /></div>
-    <h1 className="mt-5 text-2xl font-semibold tracking-tight">{titles[flow.kind]}</h1>
+    {credentials ? <h1 className="sr-only">Sign in</h1> : <h1 className="mt-5 text-2xl font-semibold tracking-tight">{titles[flow.kind]}</h1>}
     {snapshot.status === 'verifying' && <p role="status" className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">Checking your session…</p>}
     {!credentials && <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">{flow.kind === 'new-password' ? 'Replace your temporary password to continue enrollment.' : 'Enter a fresh six-digit code from your authenticator app.'}</p>}
     {(formError || snapshot.authError) && <p role="alert" className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">{formError || (snapshot.authError && errors[snapshot.authError])}</p>}
-    <form key={flow.kind} onSubmit={submit} className="mt-6 space-y-5">
+    <form key={flow.kind} onSubmit={submit} className={`${credentials ? 'mt-8' : 'mt-6'} space-y-5`}>
       <fieldset disabled={snapshot.authBusy} className="space-y-5 disabled:opacity-70">
         {credentials && <input name="username" type="text" value={client?.loginId ?? ''} readOnly tabIndex={-1} autoComplete="username" aria-hidden="true" className="sr-only" />}
         {flow.kind === 'totp' && flow.secret && flow.uri && <TotpSetup uri={flow.uri} secret={flow.secret} />}
         {code && <div><label htmlFor="auth-code" className="text-sm font-medium">Authenticator code</label><input id="auth-code" name="code" className="auth-input font-mono tracking-widest" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required aria-describedby="code-help" /><p id="code-help" className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">If you just used a code, wait until the next one appears. Check that your phone’s clock is set automatically.</p></div>}
-        {(credentials || newPassword) && <div><label htmlFor="password" className="text-sm font-medium">{newPassword ? 'New password' : 'Password'}</label><input id="password" name="password" type="password" className="auth-input" autoComplete={newPassword ? 'new-password' : 'current-password'} required maxLength={256} /></div>}
+        {(credentials || newPassword) && <div><label htmlFor="password" className={credentials ? 'sr-only' : 'text-sm font-medium'}>{newPassword ? 'New password' : 'Password'}</label><input id="password" name="password" type="password" placeholder={credentials ? 'Password' : undefined} className={credentials ? 'auth-input text-center' : 'auth-input'} autoComplete={newPassword ? 'new-password' : 'current-password'} required maxLength={256} /></div>}
         {newPassword && <div><label htmlFor="confirm-password" className="text-sm font-medium">Confirm new password</label><input id="confirm-password" name="confirm-password" type="password" className="auth-input" autoComplete="new-password" required maxLength={256} /></div>}
         {flow.kind === 'new-password' && flow.attributes.map(attribute => <div key={attribute}><label htmlFor={`attribute-${attribute}`} className="text-sm font-medium">{attribute.replaceAll('_', ' ')}</label><input id={`attribute-${attribute}`} name={`attribute-${attribute}`} className="auth-input" type={attribute === 'email' ? 'email' : 'text'} required /></div>)}
         {credentials && <div className="rounded-xl bg-zinc-50 p-4 dark:bg-zinc-800/60"><label className="flex items-center gap-3 text-sm font-medium"><input type="checkbox" checked={trust} onChange={event => setTrust(event.target.checked)} className="h-4 w-4 accent-teal-700" />Trust this device</label></div>}
