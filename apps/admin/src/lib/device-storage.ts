@@ -2,7 +2,7 @@ import type { AdminConfig } from './config'
 import type { OwnerSession } from './api'
 
 export interface DeviceProof {
-  version: 1
+  version: 2
   poolId: string
   clientId: string
   username: string
@@ -11,11 +11,11 @@ export interface DeviceProof {
   deviceKey: string
   deviceGroupKey: string
   randomPasswordKey: string
-  expiresAt: string
 }
 
-const DEVICE_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000
+type LegacyDeviceProof = Omit<DeviceProof, 'version'> & { version: 1; expiresAt: string }
 const bounded = (value: unknown): value is string => typeof value === 'string' && value.length > 0 && value.length <= 2048
+const fields = ['version', 'poolId', 'clientId', 'username', 'sub', 'loginId', 'deviceKey', 'deviceGroupKey', 'randomPasswordKey']
 
 // Amplify's public KeyValueStorage interface. SDK keys are memory-only: persistence
 // is an explicit, allowlisted copy of confirmed device proof, never a write-through.
@@ -27,7 +27,7 @@ export class DeviceStorage {
   readonly recordKey: string
   private readonly prefix: string
 
-  constructor(private readonly config: AdminConfig, private readonly persistent: Storage | null, private readonly now = Date.now) {
+  constructor(private readonly config: AdminConfig, private readonly persistent: Storage | null) {
     this.prefix = `CognitoIdentityServiceProvider.${config.clientId}.`
     this.recordKey = `janeway-admin.device.${config.poolId}.${config.clientId}`
   }
@@ -66,14 +66,28 @@ export class DeviceStorage {
     try {
       const raw = this.persistent?.getItem(this.recordKey)
       if (!raw) return null
-      const value = JSON.parse(raw) as DeviceProof
-      const expiry = Date.parse(value.expiresAt)
+      const value = JSON.parse(raw) as DeviceProof | LegacyDeviceProof
+      const expectedFields = value.version === 1 ? [...fields, 'expiresAt'] : fields
       if (
-        value.version === 1 && value.poolId === this.config.poolId && value.clientId === this.config.clientId &&
+        (value.version === 1 || value.version === 2) &&
+        Object.keys(value).length === expectedFields.length && expectedFields.every(field => Object.hasOwn(value, field)) &&
+        value.poolId === this.config.poolId && value.clientId === this.config.clientId &&
         [value.username, value.sub, value.loginId, value.deviceKey, value.deviceGroupKey, value.randomPasswordKey].every(bounded) &&
-        Number.isFinite(expiry) && expiry > this.now() && expiry <= this.now() + DEVICE_LIFETIME_MS &&
-        new Date(expiry).toISOString() === value.expiresAt
-      ) return value
+        (value.version === 2 || (typeof value.expiresAt === 'string' && Number.isFinite(Date.parse(value.expiresAt)) &&
+          new Date(value.expiresAt).toISOString() === value.expiresAt))
+      ) {
+        if (value.version === 2) return value
+        // One-time migration of the deployed 30-day browser record. Server-side
+        // Cognito existence/recovery checks remain authoritative after migration.
+        const migrated: DeviceProof = {
+          version: 2, poolId: value.poolId, clientId: value.clientId,
+          username: value.username, sub: value.sub, loginId: value.loginId,
+          deviceKey: value.deviceKey, deviceGroupKey: value.deviceGroupKey,
+          randomPasswordKey: value.randomPasswordKey,
+        }
+        this.persistent?.setItem(this.recordKey, JSON.stringify(migrated))
+        return migrated
+      }
       this.forget()
     } catch { this.forget() }
     return null
@@ -106,21 +120,16 @@ export class DeviceStorage {
 
   promote(username: string, loginId: string, session: OwnerSession): void {
     if (!this.confirmed(username, session.device.key) || !this.persistent) throw new Error('Device proof cannot be saved')
-    const previous = this.saved()
-    // A repeated sign-in cannot restart the server's creation-based lifetime.
-    const expiresAt = previous?.deviceKey === session.device.key && Date.parse(previous.expiresAt) < Date.parse(session.device.expiresAt)
-      ? previous.expiresAt : session.device.expiresAt
-    if (Date.parse(expiresAt) <= this.now()) throw new Error('Device proof has expired')
     const proof: DeviceProof = {
-      version: 1, poolId: this.config.poolId, clientId: this.config.clientId,
+      version: 2, poolId: this.config.poolId, clientId: this.config.clientId,
       username, sub: session.owner.sub, loginId, deviceKey: session.device.key,
       deviceGroupKey: this.values.get(`${this.prefix}${username}.deviceGroupKey`)!,
-      randomPasswordKey: this.values.get(`${this.prefix}${username}.randomPasswordKey`)!, expiresAt,
+      randomPasswordKey: this.values.get(`${this.prefix}${username}.randomPasswordKey`)!,
     }
     this.persistent.setItem(this.recordKey, JSON.stringify(proof))
   }
 
   forget(): void {
-    try { this.persistent?.removeItem(this.recordKey) } catch { /* The server still rejects revoked/expired proof. */ }
+    try { this.persistent?.removeItem(this.recordKey) } catch { /* The server still rejects revoked/deleted proof. */ }
   }
 }

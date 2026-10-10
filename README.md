@@ -227,19 +227,20 @@ The dashboard does not import the portfolio shell or public PostHog provider.
   passwords, one-time codes and QR seeds are not persisted. Completion, explicit
   cancellation and logout clear transaction state. A terminal retry reloads the
   document explicitly, rather than reopening a sealed SDK store.
-- **Trust this device for 30 days** is opt-in and intended only for personal
-  browsers. Only confirmed device key/group/SRP proof and its scoped identity/
-  expiry record may persist alongside the theme preference. This is a sensitive
-  possession credential, not hardware attestation or a persisted signed-in session.
-  A new session still requires the password; private/incognito windows discard
-  their saved proof when closed.
-- The server derives the deadline from Cognito's immutable device creation time,
-  checks the signed native `device_key` and authentication classification, and
-  reads current device/recovery state on every private request. Editing a browser
-  timestamp cannot extend trust. Device-auth and refreshed tokens lack the native
-  user-management scope needed to enroll replacement devices without fresh MFA.
-- Five-minute access tokens refresh serially within an eight-hour session ceiling
-  and the server's device deadline. Reload opens the custom login form. **Sign
+- **Trust this device** is opt-in and intended only for personal browsers.
+  Confirmed device key/group/SRP proof and its scoped identity record may persist
+  alongside the theme preference. This is a sensitive possession credential,
+  not hardware attestation or a persisted signed-in session. Trust has no timer:
+  it ends only when the browser/server device is forgotten or password/MFA
+  recovery revokes it. A new session still requires the account password;
+  private/incognito windows discard local proof when closed.
+- The server checks the signed native `device_key`, authentication classification,
+  current device existence and server-owned recovery timestamp on every private
+  request. Editing browser state cannot restore a deleted/revoked device.
+  Device-auth and refreshed tokens lack the native user-management scope needed
+  to enroll replacement devices without fresh MFA.
+- Five-minute access tokens refresh serially within an eight-hour session ceiling.
+  Reload opens the custom login form. **Sign
   out** clears private state, makes a bounded refresh-family revocation attempt
   and returns directly to **https://www.frankmanu.com/**. There is no signed-out
   landing page or hosted-login callback.

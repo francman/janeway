@@ -2,7 +2,7 @@ export interface OwnerSession {
   owner: { sub: string }
   authenticatedAt: number
   expiresAt: number
-  device: { key: string; createdAt: string; expiresAt: string }
+  device: { key: string; createdAt: string }
 }
 
 export interface ResumeMetadata {
@@ -16,7 +16,7 @@ export interface ResumeMetadata {
   etag: string
 }
 
-export type DeviceErrorCode = 'DEVICE_NOT_FOUND' | 'DEVICE_EXPIRED' | 'DEVICE_REVOKED'
+export type DeviceErrorCode = 'DEVICE_NOT_FOUND' | 'DEVICE_REVOKED'
 export class ApiError extends Error {
   constructor(readonly kind: 'expired' | 'denied' | 'unavailable', readonly requestId?: string, readonly code?: DeviceErrorCode) {
     super(kind)
@@ -49,7 +49,7 @@ export async function ownerRequest(
     try {
       const body = await response.json()
       if (typeof body?.error?.requestId === 'string' && /^[A-Za-z0-9_+=/-]{1,128}$/.test(body.error.requestId)) requestId = body.error.requestId
-      if (response.status === 403 && ['DEVICE_NOT_FOUND', 'DEVICE_EXPIRED', 'DEVICE_REVOKED'].includes(body?.error?.code)) code = body.error.code
+      if (response.status === 403 && ['DEVICE_NOT_FOUND', 'DEVICE_REVOKED'].includes(body?.error?.code)) code = body.error.code
     } catch { /* Only a bounded request ID, never raw backend messages, reaches UI. */ }
     throw new ApiError(response.status === 401 ? 'expired' : response.status === 403 ? 'denied' : 'unavailable', requestId, code)
   }
@@ -67,18 +67,16 @@ export async function ownerRequest(
 
 export function parseSession(value: unknown, sub: string, now: number, deviceKey: string): OwnerSession {
   const session = value as OwnerSession | null
-  const createdAt = typeof session?.device?.createdAt === 'string' ? Date.parse(session.device.createdAt) : NaN
-  const expiresAt = typeof session?.device?.expiresAt === 'string' ? Date.parse(session.device.expiresAt) : NaN
+  const deviceCreatedAt = typeof session?.device?.createdAt === 'string' ? Date.parse(session.device.createdAt) : NaN
   if (
     !session || session.owner?.sub !== sub ||
     !Number.isSafeInteger(session.authenticatedAt) || session.authenticatedAt <= 0 || session.authenticatedAt > now + 60 ||
     !Number.isSafeInteger(session.expiresAt) || session.expiresAt <= now ||
-    session.device?.key !== deviceKey || !Number.isFinite(createdAt) || !Number.isFinite(expiresAt) ||
-    createdAt <= 0 || createdAt > (now + 60) * 1000 || expiresAt <= now * 1000 ||
-    expiresAt - createdAt !== 30 * 24 * 60 * 60 * 1000 ||
-    new Date(createdAt).toISOString() !== session.device.createdAt || new Date(expiresAt).toISOString() !== session.device.expiresAt
+    session.device?.key !== deviceKey || !Number.isFinite(deviceCreatedAt) ||
+    deviceCreatedAt <= 0 || deviceCreatedAt > (now + 60) * 1000 ||
+    new Date(deviceCreatedAt).toISOString() !== session.device.createdAt
   ) throw new ApiError('unavailable')
-  return { owner: { sub }, authenticatedAt: session.authenticatedAt, expiresAt: session.expiresAt, device: { key: deviceKey, createdAt: session.device.createdAt, expiresAt: session.device.expiresAt } }
+  return { owner: { sub }, authenticatedAt: session.authenticatedAt, expiresAt: session.expiresAt, device: { key: deviceKey, createdAt: session.device.createdAt } }
 }
 
 export function parseResume(value: unknown, etag: string | null): ResumeMetadata {

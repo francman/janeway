@@ -40,7 +40,7 @@ const user = {
   authTime: 1000, expiresAt: 1300, issuer: config.authority, clientId: config.clientId,
   scope: 'janeway-admin/access aws.cognito.signin.user.admin', deviceKey: 'us-east-1_device', loginKind: 'fresh',
 }
-const device = { key: user.deviceKey, createdAt: new Date(1000_000).toISOString(), expiresAt: new Date(1000_000 + 30 * 86400_000).toISOString() }
+const device = { key: user.deviceKey, createdAt: new Date(1000_000).toISOString() }
 const session = { owner: { sub: user.sub }, authenticatedAt: 1000, expiresAt: 1300, device }
 const resume = {
   schemaVersion: 1, publicationId: '13cfb5e9-7e06-4b92-8524-f0c6ba5f0ad1', sha256: 'a'.repeat(64),
@@ -118,8 +118,8 @@ test('all SDK keys are memory-default and only explicit confirmed device promoti
   assert.equal(persistent.length, 0)
   storage.promote(user.username, 'owner@example.test', session)
   const record = JSON.parse(persistent.getItem(storage.recordKey))
-  assert.deepEqual(Object.keys(record).sort(), ['version', 'poolId', 'clientId', 'username', 'sub', 'loginId', 'deviceKey', 'deviceGroupKey', 'randomPasswordKey', 'expiresAt'].sort())
-  assert.equal(record.expiresAt, device.expiresAt)
+  assert.deepEqual(Object.keys(record).sort(), ['version', 'poolId', 'clientId', 'username', 'sub', 'loginId', 'deviceKey', 'deviceGroupKey', 'randomPasswordKey'].sort())
+  assert.equal(record.version, 2)
   assert.ok(!JSON.stringify(record).includes('synthetic-'))
   const reloaded = new DeviceStorage(config, persistent, () => 1001_000)
   reloaded.hydrate('owner@example.test')
@@ -145,30 +145,29 @@ test('sealing is irreversible; late token writes never restore readable Auth sta
   assert.equal(storage.takeRevocationToken(), null)
 })
 
-test('saved proof expires, is pool/client scoped, and repeated login cannot extend server expiry', async () => {
+test('saved proof remains until revocation, is pool/client scoped, and migrates the deployed v1 record', async () => {
   const persistent = new Storage()
-  let now = 1000_000
-  const storage = new DeviceStorage(config, persistent, () => now)
+  const storage = new DeviceStorage(config, persistent)
   await populate(storage)
   storage.promote(user.username, 'owner@example.test', session)
   const original = storage.saved()
-  now += 86400_000
-  storage.promote(user.username, 'owner@example.test', { ...session, device: { ...device, expiresAt: new Date(Date.parse(device.expiresAt) + 86400_000).toISOString() } })
-  assert.equal(storage.saved().expiresAt, original.expiresAt)
-  const otherPool = new DeviceStorage({ ...config, poolId: 'us-east-1_other' }, persistent, () => now)
-  assert.equal(otherPool.saved(), null)
-  now = Date.parse(original.expiresAt)
-  assert.equal(storage.saved(), null)
-  assert.equal(persistent.length, 0)
+  assert.equal(original.version, 2)
+  storage.promote(user.username, 'owner@example.test', session)
+  assert.deepEqual(storage.saved(), original)
+  const legacy = { ...original, version: 1, expiresAt: '2020-01-01T00:00:00.000Z' }
+  persistent.setItem(storage.recordKey, JSON.stringify(legacy))
+  assert.deepEqual(storage.saved(), original)
+  assert.equal(JSON.parse(persistent.getItem(storage.recordKey)).version, 2)
+  assert.equal(new DeviceStorage({ ...config, poolId: 'us-east-1_other' }, persistent).saved(), null)
 })
 
-test('malformed, future, and wrong-client saved proof is discarded instead of hydrated', async () => {
+test('malformed, extra-field, and wrong-client saved proof is discarded instead of hydrated', async () => {
   const persistent = new Storage()
-  const storage = new DeviceStorage(config, persistent, () => 1000_000)
+  const storage = new DeviceStorage(config, persistent)
   await populate(storage)
   storage.promote(user.username, 'owner@example.test', session)
   const valid = storage.saved()
-  for (const value of [{ ...valid, clientId: 'other' }, { ...valid, expiresAt: 'not-a-date' }, { ...valid, expiresAt: new Date(1000_000 + 31 * 86400_000).toISOString() }, { ...valid, randomPasswordKey: '' }]) {
+  for (const value of [{ ...valid, clientId: 'other' }, { ...valid, version: 3 }, { ...valid, accessToken: 'must-not-persist' }, { ...valid, randomPasswordKey: '' }]) {
     persistent.setItem(storage.recordKey, JSON.stringify(value))
     assert.equal(storage.saved(), null)
     assert.equal(persistent.length, 0)
@@ -417,7 +416,7 @@ test('late sign-in success cannot restore a cancelled session or call owner API'
 })
 
 test('device error codes clear local proof and private metadata; native Gateway errors fail closed', async t => {
-  for (const code of ['DEVICE_NOT_FOUND', 'DEVICE_EXPIRED', 'DEVICE_REVOKED', 'gateway401', 'gateway403']) {
+  for (const code of ['DEVICE_NOT_FOUND', 'DEVICE_REVOKED', 'gateway401', 'gateway403']) {
     const f = fixture(t)
     await f.start()
     await f.client.loadResume()
@@ -452,18 +451,11 @@ test('refresh cannot change identity/device/auth_time or extend the eight-hour b
   assert.equal(f.state.refreshes, 1)
 })
 
-test('server device expiry bounds an otherwise valid memory session', async t => {
-  const f = fixture(t)
-  const now = 30 * 86400 + 1000
-  f.state.now = now
-  f.setUser({ ...user, authTime: now, expiresAt: now + 300 })
-  f.setTransport(async () => response({ ...session, authenticatedAt: now, expiresAt: now + 300, device: { ...device, createdAt: new Date(1010_000).toISOString(), expiresAt: new Date((now + 10) * 1000).toISOString() } }))
-  await f.start()
-  assert.equal(f.client.getSnapshot().status, 'authenticated')
-  f.state.now += 10
-  await f.client.checkSession()
-  assert.equal(f.client.getSnapshot().status, 'expired')
-  assert.equal(f.state.requests.length, 1)
+test('device age does not expire trust locally; the memory session remains independently bounded', () => {
+  const now = 10 * 365 * 86400
+  const oldDevice = { ...device, createdAt: new Date(1000).toISOString() }
+  const result = parseSession({ ...session, authenticatedAt: now - 10, expiresAt: now + 300, device: oldDevice }, user.sub, now, user.deviceKey)
+  assert.equal(result.device.createdAt, oldDevice.createdAt)
 })
 
 test('forget uses fixed DELETE and only confirmed 204 removes local proof and signs out', async t => {
@@ -520,7 +512,7 @@ test('mismatched/malformed owner devices and publication metadata are never acce
   for (const invalid of [
     { ...session, owner: { sub: 'other' } }, { ...session, device: { ...device, key: 'other-device' } },
     { ...session, device: { ...device, createdAt: 'invalid' } },
-    { ...session, device: { ...device, expiresAt: new Date(Date.parse(device.expiresAt) + 1).toISOString() } },
+    { ...session, device: { ...device, createdAt: new Date((1000 + 61) * 1000).toISOString() } },
     { ...session, device: { ...device, createdAt: '2026-02-31T12:00:00.000Z' } },
   ]) assert.throws(() => parseSession(invalid, user.sub, 1000, user.deviceKey))
   for (const invalid of [{ ...resume, publicUrl: 'https://attacker.invalid/resume.pdf' }, { ...resume, key: 'private/other-object.pdf' }, { ...resume, bytes: 0 }, { ...resume, publishedAt: '2026-02-31T12:00:00Z' }]) assert.throws(() => parseResume(invalid, '"pointer-etag"'))

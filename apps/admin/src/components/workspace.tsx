@@ -114,7 +114,7 @@ function SessionScreen() {
     <span className="inline-flex rounded-xl bg-zinc-50 p-3 text-teal-700 dark:bg-zinc-800 dark:text-teal-400"><Icon name="lock" className="h-7 w-7" /></span>
     <div role="status" aria-live="polite"><h1 className="mt-5 text-2xl font-semibold tracking-tight">{state.title}</h1><p className="mt-4 text-sm text-zinc-600 dark:text-zinc-400">{state.description}</p></div>
     {snapshot.authError && <p role="alert" className="mt-4 text-sm"><AuthErrorMessage code={snapshot.authError} /></p>}
-    {snapshot.deviceError && <p role="alert" className="mt-4 text-sm">This device was {snapshot.deviceError === 'DEVICE_EXPIRED' ? 'expired' : snapshot.deviceError === 'DEVICE_REVOKED' ? 'revoked' : 'not found'} by the server. Local trust was cleared. Your next sign-in requires fresh authenticator verification.</p>}
+    {snapshot.deviceError && <p role="alert" className="mt-4 text-sm">This device was {snapshot.deviceError === 'DEVICE_REVOKED' ? 'revoked' : 'not found'} by the server. Local trust was cleared. Your next sign-in requires fresh authenticator verification.</p>}
     {snapshot.requestId && <p className="mt-4 break-all text-xs text-zinc-500 dark:text-zinc-400">Request ID: {snapshot.requestId}</p>}
     {!state.busy && <div className="mt-6 flex flex-wrap gap-3">
       <Button type="button" className="min-h-11" onClick={() => { if (retry) void client?.checkSession(); else client?.restart() }}>{retry ? 'Retry owner check' : 'Start a new sign-in'}</Button>

@@ -224,7 +224,7 @@ export class OwnerSessionClient {
       if (generation !== this.generation || !this.user) return
       const session = parseSession(response.value, this.user.sub, this.now(), this.user.deviceKey)
       if (session.authenticatedAt !== this.user.authTime) throw new ApiError('expired')
-      this.deadline = Math.min(this.deadline, session.authenticatedAt + MAX_SESSION_SECONDS, Date.parse(session.device.expiresAt) / 1000)
+      this.deadline = Math.min(this.deadline, session.authenticatedAt + MAX_SESSION_SECONDS)
       let deviceTrusted = this.auth.isTrusted(this.user)
       if (this.trustRequested) {
         this.trustRequested = false
