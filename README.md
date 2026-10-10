@@ -278,10 +278,12 @@ localhost. Local native-auth verification uses isolated Cognito identities and
 an origin-routed browser rehearsal; a separate real development environment
 requires its own reviewed configuration.
 
-The four public build settings are `NEXT_PUBLIC_ADMIN_ORIGIN`,
-`NEXT_PUBLIC_COGNITO_AUTHORITY`, `NEXT_PUBLIC_COGNITO_CLIENT_ID` and
-`NEXT_PUBLIC_ADMIN_API_URL`. Pool/client/API values come from `JanewayAdminStack`;
-never embed owner IDs or tokens. Native authentication connects to the regional
+The five public build settings are `NEXT_PUBLIC_ADMIN_ORIGIN`,
+`NEXT_PUBLIC_COGNITO_AUTHORITY`, `NEXT_PUBLIC_COGNITO_CLIENT_ID`,
+`NEXT_PUBLIC_COGNITO_LOGIN_ID` and `NEXT_PUBLIC_ADMIN_API_URL`.
+The fixed login ID is the owner's public email alias; the form asks only for the
+password. Pool/client/API values come from `JanewayAdminStack`; never embed the
+immutable owner subject or tokens. Native authentication connects to the regional
 Cognito API, not the retired managed-login domain.
 
 Admin releases use **Actions → Deploy owner dashboard**, manually dispatched

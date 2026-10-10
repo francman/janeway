@@ -18,6 +18,7 @@ jobs:
       NEXT_PUBLIC_ADMIN_ORIGIN: https://frank.frankmanu.com
       NEXT_PUBLIC_COGNITO_AUTHORITY: ${{ vars.ADMIN_COGNITO_AUTHORITY }}
       NEXT_PUBLIC_COGNITO_CLIENT_ID: ${{ vars.ADMIN_COGNITO_CLIENT_ID }}
+      NEXT_PUBLIC_COGNITO_LOGIN_ID: ${{ vars.ADMIN_COGNITO_LOGIN_ID }}
       NEXT_PUBLIC_ADMIN_API_URL: ${{ vars.ADMIN_API_URL }}
     steps:
       - name: Require the reviewed admin branch

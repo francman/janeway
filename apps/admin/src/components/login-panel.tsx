@@ -46,7 +46,6 @@ function TotpSetup({ uri, secret }: { uri: string; secret: string }) {
 
 export function LoginPanel() {
   const { snapshot, client } = useOwnerSession()
-  const [loginId, setLoginId] = useState('')
   const [trust, setTrust] = useState(false)
   const [formError, setFormError] = useState('')
   const flow = snapshot.flow
@@ -71,9 +70,9 @@ export function LoginPanel() {
     // Sensitive fields are uncontrolled and cleared as soon as submitted. They
     // never enter React state, storage, URLs, telemetry, or an owner API body.
     for (const input of form.querySelectorAll<HTMLInputElement>('input[type="password"], input[name="code"]')) input.value = ''
-    if (credentials) void client.signIn(loginId.trim(), password, trust)
-    else if (flow.kind === 'reset-request') void client.resetPassword(loginId.trim())
-    else if (flow.kind === 'reset-confirm') void client.completeReset(loginId.trim(), value, password)
+    if (credentials) void client.signIn(client.loginId, password, trust)
+    else if (flow.kind === 'reset-request') void client.resetPassword(client.loginId)
+    else if (flow.kind === 'reset-confirm') void client.completeReset(client.loginId, value, password)
     else if (flow.kind === 'totp') void client.confirm(value)
     else if (flow.kind === 'new-password') {
       const attributes: Record<string, string> = {}
@@ -90,7 +89,7 @@ export function LoginPanel() {
     {(formError || snapshot.authError) && <p role="alert" className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">{formError || (snapshot.authError && errors[snapshot.authError])}</p>}
     <form key={flow.kind} onSubmit={submit} className="mt-6 space-y-5">
       <fieldset disabled={snapshot.authBusy} className="space-y-5 disabled:opacity-70">
-        {(credentials || flow.kind === 'reset-request') && <div><label htmlFor="login-id" className="text-sm font-medium">Email or username</label><input id="login-id" name="username" className="auth-input" autoComplete="username" autoCapitalize="none" spellCheck={false} required maxLength={128} value={loginId} onChange={event => setLoginId(event.target.value)} /></div>}
+        {credentials && <input name="username" type="text" value={client?.loginId ?? ''} readOnly tabIndex={-1} autoComplete="username" aria-hidden="true" className="sr-only" />}
         {flow.kind === 'totp' && flow.secret && flow.uri && <TotpSetup uri={flow.uri} secret={flow.secret} />}
         {code && <div><label htmlFor="auth-code" className="text-sm font-medium">{recovery ? 'Recovery code' : 'Authenticator code'}</label><input id="auth-code" name="code" className="auth-input font-mono tracking-widest" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required aria-describedby="code-help" /><p id="code-help" className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">{recovery ? 'Enter the six-digit code from your recovery email.' : 'If you just used a code, wait until the next one appears. Check that your phone’s clock is set automatically.'}</p></div>}
         {(credentials || newPassword) && <div><label htmlFor="password" className="text-sm font-medium">{newPassword ? 'New password' : 'Password'}</label><input id="password" name="password" type="password" className="auth-input" autoComplete={newPassword ? 'new-password' : 'current-password'} required maxLength={256} /></div>}
@@ -101,7 +100,7 @@ export function LoginPanel() {
       </fieldset>
       <div className="flex flex-wrap gap-x-5 gap-y-3 text-sm">
         {credentials && <button type="button" disabled={snapshot.authBusy} className="font-medium underline underline-offset-4 disabled:opacity-50" onClick={() => { setFormError(''); client?.beginRecovery() }}>Forgot password?</button>}
-        {flow.kind === 'reset-confirm' && <button type="button" disabled={snapshot.authBusy} className="font-medium underline underline-offset-4 disabled:opacity-50" onClick={() => { void client?.resetPassword(loginId.trim()) }}>Send a new code</button>}
+        {flow.kind === 'reset-confirm' && <button type="button" disabled={snapshot.authBusy} className="font-medium underline underline-offset-4 disabled:opacity-50" onClick={() => { if (client) void client.resetPassword(client.loginId) }}>Send a new code</button>}
         {(!credentials || snapshot.authBusy) && <button type="button" className="font-medium underline underline-offset-4" onClick={() => client?.cancel()}>Cancel and start over</button>}
       </div>
     </form>

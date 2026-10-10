@@ -15,7 +15,7 @@ const moduleValue = { exports: {} }
 const code = ts.transpileModule(fs.readFileSync(filename, 'utf8'), { fileName: filename, compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText
 new vm.Script(code, { filename }).runInContext(vm.createContext({ module: moduleValue, exports: moduleValue.exports }))
 const { DeviceStorage } = moduleValue.exports
-const config = { poolId: 'us-east-1_fixture', clientId: 'fixtureclient' }
+const config = { poolId: 'us-east-1_fixture', clientId: 'fixtureclient', loginId: 'owner@example.test' }
 const prefix = `CognitoIdentityServiceProvider.${config.clientId}.`
 const username = 'canonical-owner'
 const jwt = claims => `${Buffer.from(JSON.stringify({ alg: 'RS256' })).toString('base64url')}.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.synthetic-signature`

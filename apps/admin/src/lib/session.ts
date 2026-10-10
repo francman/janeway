@@ -38,12 +38,15 @@ export class OwnerSessionClient {
   private trustRequested = false
   private readonly requests = new Set<AbortController>()
 
+  readonly loginId: string
   constructor(
     private readonly config: AdminConfig,
     private readonly auth: AuthPort,
     private readonly transport: typeof fetch = fetch,
     private readonly now = () => Math.floor(Date.now() / 1000),
-  ) {}
+  ) {
+    this.loginId = config.loginId
+  }
 
   getSnapshot = (): SessionSnapshot => this.snapshot
   subscribe = (listener: () => void): (() => void) => {

@@ -32,7 +32,7 @@ const config = {
   origin: 'https://admin.example.test',
   authority: 'https://cognito-idp.us-east-1.amazonaws.com/us-east-1_fixture',
   poolId: 'us-east-1_fixture', clientId: 'fixtureclient',
-  apiUrl: 'https://fixture.execute-api.us-east-1.amazonaws.com',
+  loginId: 'owner@example.test', apiUrl: 'https://fixture.execute-api.us-east-1.amazonaws.com',
 }
 const prefix = `CognitoIdentityServiceProvider.${config.clientId}.`
 const user = {
