@@ -16,7 +16,8 @@ if (origin !== 'https://frank.frankmanu.com') throw new Error('Production admin 
 const connectionNames = ['NEXT_PUBLIC_COGNITO_AUTHORITY', 'NEXT_PUBLIC_ADMIN_API_URL', 'NEXT_PUBLIC_RESUME_PREVIEW_ORIGIN']
 const connectionUrls = Object.fromEntries(connectionNames.map(name => {
   const url = new URL(process.env[name] || '')
-  if (url.protocol !== 'https:' || url.username || url.password || url.pathname !== '/' || url.search || url.hash) throw new Error(`Invalid ${name}`)
+  const validPath = name === 'NEXT_PUBLIC_COGNITO_AUTHORITY' ? /^\/us-east-1_[A-Za-z0-9]+$/.test(url.pathname) : url.pathname === '/'
+  if (url.protocol !== 'https:' || url.username || url.password || !validPath || url.search || url.hash) throw new Error(`Invalid ${name}`)
   return [name, url.origin]
 }))
 const connections = Object.values(connectionUrls)
