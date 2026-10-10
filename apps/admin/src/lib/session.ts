@@ -11,7 +11,7 @@ export interface SessionSnapshot {
   flow: Exclude<AuthStep, { kind: 'done' }>
   authBusy: boolean
   authError?: AuthErrorCode
-  notice?: 'password-reset' | 'trust-failed'
+  notice?: 'trust-failed'
   deviceTrusted: boolean
   deviceStatus: 'idle' | 'forgetting' | 'error'
   deviceError?: DeviceErrorCode
@@ -86,23 +86,6 @@ export class OwnerSessionClient {
   async confirm(value: string, attributes?: Record<string, string>): Promise<void> {
     if (this.snapshot.status !== 'login' || this.snapshot.authBusy || !['totp', 'new-password'].includes(this.snapshot.flow.kind)) return
     await this.authenticate(() => this.auth.confirm(value, attributes), true)
-  }
-  beginRecovery(): void {
-    if (this.snapshot.status === 'login' && !this.snapshot.authBusy && this.snapshot.flow.kind === 'credentials') {
-      this.publish({ flow: { kind: 'reset-request' }, authError: undefined, notice: undefined })
-    }
-  }
-  async resetPassword(loginId: string): Promise<void> {
-    if (this.snapshot.status !== 'login' || this.snapshot.authBusy || !['reset-request', 'reset-confirm'].includes(this.snapshot.flow.kind)) return
-    await this.authenticate(() => this.auth.reset(loginId))
-  }
-  async completeReset(loginId: string, code: string, password: string): Promise<void> {
-    if (this.snapshot.status !== 'login' || this.snapshot.authBusy || this.snapshot.flow.kind !== 'reset-confirm') return
-    await this.authenticate(async () => {
-      await this.auth.completeReset(loginId, code, password)
-      return { kind: 'credentials' }
-    })
-    if (this.getSnapshot().status === 'login' && this.getSnapshot().flow.kind === 'credentials') this.publish({ notice: 'password-reset' })
   }
 
   private async authenticate(operation: () => Promise<AuthStep>, challenge = false): Promise<void> {

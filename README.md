@@ -220,8 +220,9 @@ The dashboard does not import the portfolio shell or public PostHog provider.
 
 - Cognito `janewayUsers` / `janewayDashboard` still verifies credentials and
   requires TOTP for untrusted devices. Custom Janeway forms use maintained
-  Amplify Auth SRP APIs for sign-in, initial password replacement, recovery and
-  TOTP setup/challenges. No signup, client secret or IAM browser keys.
+  Amplify Auth SRP APIs for sign-in, initial password replacement and TOTP
+  setup/challenges. Password reset is an AWS Cognito operator action, not a
+  public dashboard link. No signup, client secret or IAM browser keys.
 - Access/ID/rotating-refresh tokens and private state stay in memory. The SDK's
   short-lived sign-in challenge transaction uses per-tab sessionStorage;
   passwords, one-time codes and QR seeds are not persisted. Completion, explicit
@@ -251,8 +252,8 @@ The dashboard does not import the portfolio shell or public PostHog provider.
   of a device credential; use server forgetting or operator recovery for that.
 - Exact issuer/client/access-token/scope/owner/activation checks remain.
   Enrollment does not grant dashboard access until the operator activates the
-  verified identity. Password recovery stamps server-owned revocation state;
-  MFA recovery also forgets device records. Revoked/expired/deleted device errors
+  verified identity. Cognito password recovery stamps server-owned revocation
+  state; MFA recovery also forgets device records. Revoked/deleted device errors
   clear local trust and require a fresh MFA sign-in.
 - Expiry/denial clears private views. Unavailability hides stale metadata and
   offers retry. Late SDK/token/API responses cannot restore a sealed session.

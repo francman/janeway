@@ -51,10 +51,9 @@ export function LoginPanel() {
   const [formError, setFormError] = useState('')
   const flow = snapshot.flow
   const credentials = flow.kind === 'credentials'
-  const recovery = flow.kind === 'reset-request' || flow.kind === 'reset-confirm'
-  const newPassword = flow.kind === 'new-password' || flow.kind === 'reset-confirm'
-  const code = flow.kind === 'totp' || flow.kind === 'reset-confirm'
-  const titles = { credentials: 'Sign in', 'new-password': 'Choose your password', totp: flow.kind === 'totp' && flow.secret ? 'Set up your authenticator' : 'Verify it is you', 'reset-request': 'Reset your password', 'reset-confirm': 'Check your recovery email' }
+  const newPassword = flow.kind === 'new-password'
+  const code = flow.kind === 'totp'
+  const titles = { credentials: 'Sign in', 'new-password': 'Choose your password', totp: flow.secret ? 'Set up your authenticator' : 'Verify it is you' }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -72,8 +71,6 @@ export function LoginPanel() {
     // never enter React state, storage, URLs, telemetry, or an owner API body.
     for (const input of form.querySelectorAll<HTMLInputElement>('input[type="password"], input[name="code"]')) input.value = ''
     if (credentials) void client.signIn(client.loginId, password, trust)
-    else if (flow.kind === 'reset-request') void client.resetPassword(client.loginId)
-    else if (flow.kind === 'reset-confirm') void client.completeReset(client.loginId, value, password)
     else if (flow.kind === 'totp') void client.confirm(value)
     else if (flow.kind === 'new-password') {
       const attributes: Record<string, string> = {}
@@ -86,23 +83,20 @@ export function LoginPanel() {
     <div className="flex justify-center"><ThemeToggle /></div>
     <h1 className="mt-5 text-2xl font-semibold tracking-tight">{titles[flow.kind]}</h1>
     {snapshot.status === 'verifying' && <p role="status" className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">Checking your session…</p>}
-    {!credentials && <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">{flow.kind === 'new-password' ? 'Replace your temporary password to continue enrollment.' : flow.kind === 'totp' ? 'Enter a fresh six-digit code from your authenticator app.' : flow.kind === 'reset-request' ? 'Request a password-reset code for your account. This does not reset your authenticator.' : `If recovery is available, use the code sent to ${flow.kind === 'reset-confirm' && flow.destination ? flow.destination : 'your registered email address'}.`}</p>}
-    {snapshot.notice === 'password-reset' && <p role="status" className="mt-4 text-sm text-teal-700 dark:text-teal-400">Your password was reset. Saved device trust has been revoked. Sign in again with your password and authenticator.</p>}
+    {!credentials && <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">{flow.kind === 'new-password' ? 'Replace your temporary password to continue enrollment.' : 'Enter a fresh six-digit code from your authenticator app.'}</p>}
     {(formError || snapshot.authError) && <p role="alert" className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">{formError || (snapshot.authError && errors[snapshot.authError])}</p>}
     <form key={flow.kind} onSubmit={submit} className="mt-6 space-y-5">
       <fieldset disabled={snapshot.authBusy} className="space-y-5 disabled:opacity-70">
         {credentials && <input name="username" type="text" value={client?.loginId ?? ''} readOnly tabIndex={-1} autoComplete="username" aria-hidden="true" className="sr-only" />}
         {flow.kind === 'totp' && flow.secret && flow.uri && <TotpSetup uri={flow.uri} secret={flow.secret} />}
-        {code && <div><label htmlFor="auth-code" className="text-sm font-medium">{recovery ? 'Recovery code' : 'Authenticator code'}</label><input id="auth-code" name="code" className="auth-input font-mono tracking-widest" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required aria-describedby="code-help" /><p id="code-help" className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">{recovery ? 'Enter the six-digit code from your recovery email.' : 'If you just used a code, wait until the next one appears. Check that your phone’s clock is set automatically.'}</p></div>}
+        {code && <div><label htmlFor="auth-code" className="text-sm font-medium">Authenticator code</label><input id="auth-code" name="code" className="auth-input font-mono tracking-widest" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required aria-describedby="code-help" /><p id="code-help" className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">If you just used a code, wait until the next one appears. Check that your phone’s clock is set automatically.</p></div>}
         {(credentials || newPassword) && <div><label htmlFor="password" className="text-sm font-medium">{newPassword ? 'New password' : 'Password'}</label><input id="password" name="password" type="password" className="auth-input" autoComplete={newPassword ? 'new-password' : 'current-password'} required maxLength={256} /></div>}
         {newPassword && <div><label htmlFor="confirm-password" className="text-sm font-medium">Confirm new password</label><input id="confirm-password" name="confirm-password" type="password" className="auth-input" autoComplete="new-password" required maxLength={256} /></div>}
         {flow.kind === 'new-password' && flow.attributes.map(attribute => <div key={attribute}><label htmlFor={`attribute-${attribute}`} className="text-sm font-medium">{attribute.replaceAll('_', ' ')}</label><input id={`attribute-${attribute}`} name={`attribute-${attribute}`} className="auth-input" type={attribute === 'email' ? 'email' : 'text'} required /></div>)}
         {credentials && <div className="rounded-xl bg-zinc-50 p-4 dark:bg-zinc-800/60"><label className="flex items-center gap-3 text-sm font-medium"><input type="checkbox" checked={trust} onChange={event => setTrust(event.target.checked)} className="h-4 w-4 accent-teal-700" />Trust this device</label></div>}
-        <Button type="submit" className="min-h-11 w-full">{snapshot.authBusy ? 'Please wait…' : credentials ? 'Sign in' : flow.kind === 'reset-request' ? 'Send recovery code' : flow.kind === 'reset-confirm' ? 'Reset password' : 'Continue'}</Button>
+        <Button type="submit" className="min-h-11 w-full">{snapshot.authBusy ? 'Please wait…' : credentials ? 'Sign in' : 'Continue'}</Button>
       </fieldset>
       <div className="flex flex-wrap gap-x-5 gap-y-3 text-sm">
-        {credentials && <button type="button" disabled={snapshot.authBusy} className="font-medium underline underline-offset-4 disabled:opacity-50" onClick={() => { setFormError(''); client?.beginRecovery() }}>Forgot password?</button>}
-        {flow.kind === 'reset-confirm' && <button type="button" disabled={snapshot.authBusy} className="font-medium underline underline-offset-4 disabled:opacity-50" onClick={() => { if (client) void client.resetPassword(client.loginId) }}>Send a new code</button>}
         {(!credentials || snapshot.authBusy) && <button type="button" className="font-medium underline underline-offset-4" onClick={() => client?.cancel()}>Cancel and start over</button>}
       </div>
     </form>

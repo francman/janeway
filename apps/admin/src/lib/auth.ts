@@ -1,6 +1,6 @@
 import { Amplify } from 'aws-amplify'
 import { cognitoUserPoolsTokenProvider } from 'aws-amplify/auth/cognito'
-import { signIn, confirmSignIn, fetchAuthSession, resetPassword, confirmResetPassword, rememberDevice, type SignInOutput } from 'aws-amplify/auth'
+import { signIn, confirmSignIn, fetchAuthSession, rememberDevice, type SignInOutput } from 'aws-amplify/auth'
 import type { AdminConfig } from './config'
 import type { OwnerSession } from './api'
 import { DeviceStorage } from './device-storage'
@@ -21,8 +21,6 @@ export type AuthStep =
   | { kind: 'credentials' }
   | { kind: 'new-password'; attributes: string[] }
   | { kind: 'totp'; secret?: string; uri?: string }
-  | { kind: 'reset-request' }
-  | { kind: 'reset-confirm'; destination?: string }
   | { kind: 'done'; user: AuthUser }
 export type AuthErrorCode = 'credentials' | 'code-mismatch' | 'code-expired' | 'transaction-expired' | 'password-policy' | 'rate-limit' | 'network' | 'unsupported' | 'device-confirmation' | 'trust-failed' | 'cancelled'
 export class AuthFailure extends Error {
@@ -49,8 +47,6 @@ export function authFailure(error: unknown, challenge = false): AuthFailure {
 export interface AuthPort {
   signIn(loginId: string, password: string): Promise<AuthStep>
   confirm(value: string, attributes?: Record<string, string>): Promise<AuthStep>
-  reset(loginId: string): Promise<AuthStep>
-  completeReset(loginId: string, code: string, password: string): Promise<void>
   refresh(): Promise<AuthUser>
   trust(user: AuthUser, session: OwnerSession): Promise<boolean>
   isTrusted(user: AuthUser): boolean
@@ -60,7 +56,7 @@ export interface AuthPort {
   signOut(): Promise<void>
 }
 
-const sdk = { signIn, confirmSignIn, fetchAuthSession, resetPassword, confirmResetPassword, rememberDevice }
+const sdk = { signIn, confirmSignIn, fetchAuthSession, rememberDevice }
 export type NativeSdk = typeof sdk
 export interface AuthEnvironment {
   transactions: Pick<Storage, 'clear'>
@@ -139,7 +135,6 @@ export class NativeAuth implements AuthPort {
       case 'CONTINUE_SIGN_IN_WITH_MFA_SETUP_SELECTION':
         if (next.allowedMFATypes?.includes('TOTP')) return this.step(await this.api.confirmSignIn({ challengeResponse: 'TOTP' }))
         break
-      case 'RESET_PASSWORD': return { kind: 'reset-request' }
     }
     throw new AuthFailure('unsupported', true)
   }
@@ -153,21 +148,6 @@ export class NativeAuth implements AuthPort {
   }
   confirm(value: string, attributes?: Record<string, string>): Promise<AuthStep> {
     return this.run(async () => this.step(await this.api.confirmSignIn({ challengeResponse: value, options: { userAttributes: attributes } })), true)
-  }
-  reset(loginId: string): Promise<AuthStep> {
-    return this.run(async () => {
-      this.loginId = loginId
-      const result = await this.api.resetPassword({ username: loginId })
-      return result.nextStep.resetPasswordStep === 'CONFIRM_RESET_PASSWORD_WITH_CODE'
-        ? { kind: 'reset-confirm', destination: result.nextStep.codeDeliveryDetails.destination }
-        : { kind: 'credentials' }
-    })
-  }
-  completeReset(loginId: string, code: string, password: string): Promise<void> {
-    return this.run(async () => {
-      await this.api.confirmResetPassword({ username: loginId, confirmationCode: code, newPassword: password })
-      this.storage.forget()
-    })
   }
   refresh(): Promise<AuthUser> { return this.run(() => this.user(true)) }
   isTrusted(user: AuthUser): boolean { return this.storage.isSaved(user.username, user.sub, user.deviceKey) }

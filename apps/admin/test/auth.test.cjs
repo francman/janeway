@@ -78,7 +78,6 @@ function fixture(t) {
   let transport = async url => response(url.endsWith('/session') ? { ...session, expiresAt: state.now + 300 } : url.endsWith('/device') ? null : resume, url.endsWith('/device') ? 204 : 200)
   const auth = {
     signIn: async () => { state.signIns++; return signIn() }, confirm: async () => signIn(),
-    reset: async () => ({ kind: 'reset-confirm' }), completeReset: async () => { state.forgotten++ },
     refresh: async () => { state.refreshes++; return refresh() }, clear: () => { state.clears++ },
     signOut: async () => { state.signOuts++ }, restart: () => { state.restarts++ },
     isTrusted: () => state.saved, trust: async () => { state.trusts++; return trust() }, forgetLocal: () => { state.forgotten++; state.saved = false },
@@ -102,8 +101,6 @@ function nativeFixture() {
     confirmSignIn: async () => ({ isSignedIn: false, nextStep: { signInStep: 'CONFIRM_SIGN_IN_WITH_TOTP_CODE' } }),
     fetchAuthSession: async () => ({ tokens: { accessToken: token } }),
     rememberDevice: async () => { state.remembers++ },
-    resetPassword: async () => ({ nextStep: { resetPasswordStep: 'CONFIRM_RESET_PASSWORD_WITH_CODE', codeDeliveryDetails: { destination: 'o***@example.test' } } }),
-    confirmResetPassword: async () => {},
   }
   const environment = { transactions, navigate: url => state.navigations.push(url), transport: async (url, options) => { state.requests.push({ url, options }); return response({}) } }
   const auth = new NativeAuth(config, storage, environment, sdk)
@@ -272,17 +269,6 @@ test('revocation network failure still clears local state and navigates to publi
   assert.deepEqual(f.state.navigations, ['https://www.frankmanu.com/'])
 })
 
-test('successful password recovery clears saved proof; failed confirmation does not claim recovery', async () => {
-  const f = nativeFixture()
-  await populate(f.storage)
-  f.storage.promote(user.username, 'owner@example.test', session)
-  f.sdk.confirmResetPassword = async () => { throw { name: 'CodeMismatchException' } }
-  await assert.rejects(f.auth.completeReset('owner@example.test', '123456', 'new-password'), error => error.code === 'code-mismatch')
-  assert.equal(f.persistent.length, 1)
-  f.sdk.confirmResetPassword = async () => {}
-  await f.auth.completeReset('owner@example.test', '654321', 'new-password')
-  assert.equal(f.persistent.length, 0)
-})
 
 test('reused or expired TOTP remains retryable; invalid sign-in transaction is terminal', async t => {
   assert.equal(authFailure({ name: 'ExpiredCodeException', message: 'software token has already been used once' }, true).code, 'code-expired')
