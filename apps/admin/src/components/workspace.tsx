@@ -67,15 +67,15 @@ export function Workspace({ page, children }: { page: WorkspacePage; children: R
       {navigation(false)}
     </aside>}
     <div className={authenticated ? 'flex min-h-screen flex-col lg:pl-[248px]' : 'flex min-h-screen flex-col'}>
-      <header className="admin-topbar">
+      {authenticated && <header className="admin-topbar">
         <div className="flex min-w-0 items-center gap-3">
-          {authenticated && <button ref={menuButton} type="button" className="icon-button lg:hidden" aria-label="Open navigation" aria-expanded={menuOpen} aria-controls="mobile-navigation" onClick={() => { drawer.current?.showModal(); setMenuOpen(true) }}><Icon name="menu" className="h-5 w-5" /></button>}
+          <button ref={menuButton} type="button" className="icon-button lg:hidden" aria-label="Open navigation" aria-expanded={menuOpen} aria-controls="mobile-navigation" onClick={() => { drawer.current?.showModal(); setMenuOpen(true) }}><Icon name="menu" className="h-5 w-5" /></button>
           <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 text-sm">
-            {authenticated ? <span className="whitespace-nowrap text-zinc-500 dark:text-zinc-400">Workspace</span> : <a href="https://www.frankmanu.com/" className="whitespace-nowrap text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100">Frank Manu</a>}<span aria-hidden="true" className="text-zinc-400">/</span><span className="truncate font-medium">{authenticated ? pages[page].title : 'Dashboard'}</span>
+            <span className="whitespace-nowrap text-zinc-500 dark:text-zinc-400">Workspace</span><span aria-hidden="true" className="text-zinc-400">/</span><span className="truncate font-medium">{pages[page].title}</span>
           </nav>
         </div>
         <ThemeToggle />
-      </header>
+      </header>}
       <main id="main" tabIndex={-1} className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col p-4 outline-none sm:p-6 xl:p-8">
         <div className="flex-1">
         {configurationError ? <section className="panel mx-auto mt-8 max-w-xl" role="alert"><Icon name="lock" className="h-8 w-8 text-teal-700 dark:text-teal-400" /><h1 className="mt-5 text-2xl font-semibold tracking-tight">Dashboard setup unavailable</h1><p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">The sign-in configuration could not be loaded securely. Use the configured dashboard address and allow session storage for the temporary sign-in transaction. If this persists, the deployment operator needs to check the public Cognito and API configuration.</p><a href="https://www.frankmanu.com/" className="mt-6 inline-block text-sm font-medium underline underline-offset-4">Return to the public website</a></section> : authenticated ? <>

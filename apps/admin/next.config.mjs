@@ -4,6 +4,7 @@ const nextConfig = {
   trailingSlash: true,
   poweredByHeader: false,
   reactStrictMode: true,
+  devIndicators: { buildActivity: false, appIsrStatus: false },
   transpilePackages: ['@janeway/ui'],
   images: { unoptimized: true },
 }

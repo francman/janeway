@@ -7,17 +7,19 @@ export interface AdminConfig {
   apiUrl: string
 }
 
-function httpsOrigin(value: string | undefined): string {
+function httpsOrigin(value: string | undefined, allowLoopback = false): string {
   if (!value || value.trim() !== value) throw new Error('Invalid public configuration')
   const url = new URL(value)
-  if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash || url.pathname !== '/') {
+  const loopback = allowLoopback && url.protocol === 'http:' &&
+    (url.hostname === '127.0.0.1' || url.hostname === 'localhost' || url.hostname === '[::1]')
+  if ((!loopback && url.protocol !== 'https:') || url.username || url.password || url.search || url.hash || url.pathname !== '/') {
     throw new Error('Invalid public configuration')
   }
   return url.origin
 }
 
 export function readAdminConfig(): AdminConfig {
-  const origin = httpsOrigin(process.env.NEXT_PUBLIC_ADMIN_ORIGIN)
+  const origin = httpsOrigin(process.env.NEXT_PUBLIC_ADMIN_ORIGIN, true)
   const apiUrl = httpsOrigin(process.env.NEXT_PUBLIC_ADMIN_API_URL)
   const authority = process.env.NEXT_PUBLIC_COGNITO_AUTHORITY
   const clientId = process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID

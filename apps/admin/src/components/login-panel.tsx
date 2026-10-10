@@ -5,6 +5,7 @@ import { toCanvas } from 'qrcode'
 import { Button } from '@janeway/ui/button'
 import { Icon } from './icon'
 import { useOwnerSession } from './session-provider'
+import { ThemeToggle } from './theme-toggle'
 import type { AuthErrorCode } from '../lib/auth'
 
 const errors: Record<AuthErrorCode, string> = {
@@ -82,7 +83,7 @@ export function LoginPanel() {
   }
 
   return <section className="panel mx-auto mt-4 max-w-lg sm:mt-8" aria-busy={snapshot.authBusy}>
-    <span className="inline-flex rounded-xl bg-teal-50 p-3 text-teal-700 dark:bg-teal-950 dark:text-teal-400"><Icon name="lock" className="h-7 w-7" /></span>
+    <div className="flex items-center justify-between gap-4"><span className="inline-flex rounded-xl bg-teal-50 p-3 text-teal-700 dark:bg-teal-950 dark:text-teal-400"><Icon name="lock" className="h-7 w-7" /></span><ThemeToggle /></div>
     <h1 className="mt-5 text-2xl font-semibold tracking-tight">{titles[flow.kind]}</h1>
     {!credentials && <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">{flow.kind === 'new-password' ? 'Replace your temporary password to continue enrollment.' : flow.kind === 'totp' ? 'Enter a fresh six-digit code from your authenticator app.' : flow.kind === 'reset-request' ? 'Request a password-reset code for your account. This does not reset your authenticator.' : `If recovery is available, use the code sent to ${flow.kind === 'reset-confirm' && flow.destination ? flow.destination : 'your registered email address'}.`}</p>}
     {snapshot.notice === 'password-reset' && <p role="status" className="mt-4 text-sm text-teal-700 dark:text-teal-400">Your password was reset. Saved device trust has been revoked. Sign in again with your password and authenticator.</p>}

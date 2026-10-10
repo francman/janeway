@@ -272,11 +272,13 @@ belong in build variables, logs, analytics or release artifacts.
 
 Install from the root with `npm ci`; there is one lockfile. `npm run test:admin`
 exercises session/security behavior; `npm run build:admin` exports
-`apps/admin/out`. Public build/lint/tests remain separate. `npm run dev:admin`
-starts development, but production-origin enforcement intentionally rejects
-localhost. Local native-auth verification uses isolated Cognito identities and
-an origin-routed browser rehearsal; a separate real development environment
-requires its own reviewed configuration.
+`apps/admin/out`. Public build/lint/tests remain separate. Local visual review may
+use an explicitly configured `http://localhost` / `http://127.0.0.1` origin;
+other plaintext/noncanonical origins still fail closed. Production always builds
+for `https://frank.frankmanu.com`. Local preview is not a second auth environment:
+the production API's exact CORS boundary prevents it from opening private data.
+Do not enter production credentials there. A functioning development identity/API
+environment requires separate reviewed resources and configuration.
 
 The five public build settings are `NEXT_PUBLIC_ADMIN_ORIGIN`,
 `NEXT_PUBLIC_COGNITO_AUTHORITY`, `NEXT_PUBLIC_COGNITO_CLIENT_ID`,
