@@ -35,9 +35,17 @@ async function main() {
     }
     console.log(JSON.stringify({ method, route, anonymousAndInvalidToken: 401 }))
   }
+  const notFound = await fetch(origin + '/404.html', { redirect: 'manual' })
+  assert.equal(notFound.status, 200)
+  assert.match(notFound.headers.get('content-type') || '', /text\/html/)
+  const notFoundHtml = await notFound.text()
+  assert.match(notFoundHtml, /This page could not be found/)
   for (const route of ['/auth/callback/', '/signed-out/']) {
+    // Amplify's documented not-found rule is a client-side 302 to the generic
+    // /404.html artifact, not a direct 404 response at the retired URL.
     const response = await fetch(origin + route, { redirect: 'manual' })
-    assert.equal(response.status, 404, `${route} must not retain the retired authentication flow`)
+    assert.equal(response.status, 302, `${route} must use the not-found rule`)
+    assert.equal(response.headers.get('location'), '/404.html')
     await response.arrayBuffer()
   }
   for (const requestOrigin of [origin, 'https://untrusted.invalid']) {
