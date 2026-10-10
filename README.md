@@ -119,6 +119,11 @@ content, revalidate caches, fetch secrets, or deploy anything. Browser requests
 are restricted to GET/HEAD on the configured site/CDN; third-party requests,
 mutations, WebSockets, and unexpected redirects are blocked.
 
+Browser cleanup closes the owning context after the required checks. Canceled
+Next prefetch routes can leave Playwright's route-drain waiter unresolved even
+after callbacks finish; do not wait on that drain or dispose responses after
+their context closes. [API response buffers are released when the context closes](https://playwright.dev/docs/api/class-apiresponse#api-response-dispose).
+
 Required checks cover usable homepage/writings content, the known article's
 visible title and MDX body, initial crawler HTML sharing identity, its actual
 decoded immutable CDN image, canonical/encoded legacy and revision MDX denial,

@@ -102,6 +102,9 @@ async function startFixture() {
     if (state.fault === 'bootstrap-replaces-dom') {
       metadata += '<style id="boot-style">img { animation: boot .1s infinite alternate; } @keyframes boot { to { transform: translateX(2px); } }</style><script async src="/bootstrap.js"></script>'
     }
+    if (state.fault === 'cancelled-prefetch') {
+      metadata += '<script>const prefetch = new AbortController(); fetch("/speculative-prefetch", {signal: prefetch.signal}).catch(() => {}); setTimeout(() => prefetch.abort(), 20);</script>'
+    }
     return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Release fixture</title>${metadata}<style>
       * { box-sizing: border-box; } body { margin: 0; font: 16px sans-serif; }
       main { max-width: 900px; width: 100%; margin: auto; padding: 20px; }
@@ -130,6 +133,10 @@ async function startFixture() {
 
   const site = http.createServer((req, res) => {
     const pathname = req.url.split('?')[0]
+    if (pathname === '/speculative-prefetch') {
+      setTimeout(() => respond(req, res, 200, 'application/json', '{"prefetched":true}'), 200)
+      return
+    }
     if (pathname === '/bootstrap.js') {
       setTimeout(() => respond(req, res, 200, 'application/javascript', "const main = document.querySelector('main'); main.replaceWith(main.cloneNode(true)); document.querySelector('#boot-style').remove();"), 500)
       return

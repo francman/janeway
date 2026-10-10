@@ -119,6 +119,12 @@ test('deployed public contract against real HTTP and Chromium', { timeout: 30000
     passing(result, fixture)
   })
 
+  await t.test('cancelled speculative fetches cannot deadlock completion of the verified public report', { timeout: 20000 }, async () => {
+    const { result } = await run('cancelled-prefetch')
+    passing(result, fixture)
+    assert.ok(fixture.state.requests.some(request => request.path === '/speculative-prefetch'))
+  })
+
   const cases = [
     { name: 'homepage error shell cannot pass from a marker in script data', fault: 'home-error-shell', failed: 'home' },
     { name: 'HTTP 200 error shell is not article content', fault: 'error-shell', failed: 'article-content' },
