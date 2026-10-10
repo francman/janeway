@@ -55,7 +55,6 @@ export function Workspace({ page, children }: { page: WorkspacePage; children: R
       <a href="https://www.frankmanu.com/" target="_blank" rel="noopener noreferrer" className="nav-button"><Icon name="arrow" className="h-5 w-5 shrink-0" />View public website<span className="sr-only"> (opens in a new tab)</span></a>
       <button type="button" className="nav-button" onClick={() => { drawer.current?.close(); void client?.signOut() }}><Icon name="lock" className="h-5 w-5 shrink-0" />Sign out</button>
       <button type="button" className="nav-button disabled:opacity-50" disabled={snapshot.deviceStatus === 'forgetting'} onClick={() => { drawer.current?.close(); void client?.forgetDevice() }}><Icon name="lock" className="h-5 w-5 shrink-0" />{snapshot.deviceStatus === 'forgetting' ? 'Forgetting this browser…' : 'Forget this browser and sign out'}</button>
-      <p className="px-3 py-2 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">{snapshot.deviceTrusted ? `Trusted until ${new Date(snapshot.session!.device.expiresAt).toLocaleString()}.` : 'Device proof is not saved in this browser.'} Sign-out keeps saved trust. Forgetting removes this device on the server and requires MFA next time.</p>
     </div>
   </>
 
