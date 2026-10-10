@@ -54,7 +54,7 @@ export function LoginPanel() {
   const recovery = flow.kind === 'reset-request' || flow.kind === 'reset-confirm'
   const newPassword = flow.kind === 'new-password' || flow.kind === 'reset-confirm'
   const code = flow.kind === 'totp' || flow.kind === 'reset-confirm'
-  const titles = { credentials: 'Welcome back', 'new-password': 'Choose your password', totp: flow.kind === 'totp' && flow.secret ? 'Set up your authenticator' : 'Verify it is you', 'reset-request': 'Reset your password', 'reset-confirm': 'Check your recovery email' }
+  const titles = { credentials: 'Sign in', 'new-password': 'Choose your password', totp: flow.kind === 'totp' && flow.secret ? 'Set up your authenticator' : 'Verify it is you', 'reset-request': 'Reset your password', 'reset-confirm': 'Check your recovery email' }
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -85,7 +85,7 @@ export function LoginPanel() {
   return <section className="panel mx-auto mt-4 max-w-lg sm:mt-8" aria-busy={snapshot.authBusy}>
     <span className="inline-flex rounded-xl bg-teal-50 p-3 text-teal-700 dark:bg-teal-950 dark:text-teal-400"><Icon name="lock" className="h-7 w-7" /></span>
     <h1 className="mt-5 text-2xl font-semibold tracking-tight">{titles[flow.kind]}</h1>
-    <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">{credentials ? 'Sign in to your personal workspace.' : flow.kind === 'new-password' ? 'Replace your temporary password to continue enrollment.' : flow.kind === 'totp' ? 'Enter a fresh six-digit code from your authenticator app.' : flow.kind === 'reset-request' ? 'Request a password-reset code for your account. This does not reset your authenticator.' : `If recovery is available, use the code sent to ${flow.kind === 'reset-confirm' && flow.destination ? flow.destination : 'your registered email address'}.`}</p>
+    {!credentials && <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">{flow.kind === 'new-password' ? 'Replace your temporary password to continue enrollment.' : flow.kind === 'totp' ? 'Enter a fresh six-digit code from your authenticator app.' : flow.kind === 'reset-request' ? 'Request a password-reset code for your account. This does not reset your authenticator.' : `If recovery is available, use the code sent to ${flow.kind === 'reset-confirm' && flow.destination ? flow.destination : 'your registered email address'}.`}</p>}
     {snapshot.notice === 'password-reset' && <p role="status" className="mt-4 text-sm text-teal-700 dark:text-teal-400">Your password was reset. Saved device trust has been revoked. Sign in again with your password and authenticator.</p>}
     {(formError || snapshot.authError) && <p role="alert" className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">{formError || (snapshot.authError && errors[snapshot.authError])}</p>}
     <form key={flow.kind} onSubmit={submit} className="mt-6 space-y-5">
@@ -105,15 +105,6 @@ export function LoginPanel() {
         {(!credentials || snapshot.authBusy) && <button type="button" className="font-medium underline underline-offset-4" onClick={() => client?.cancel()}>Cancel and start over</button>}
       </div>
     </form>
-    <div className="mt-6 border-t border-zinc-200 pt-4 text-xs leading-relaxed text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
-      <p>Secured by Cognito. Passwords and access/refresh tokens stay out of persistent browser storage.</p>
-      <details className="mt-3">
-        <summary className="cursor-pointer font-medium">Device trust and privacy</summary>
-        <p className="mt-2">Opting in saves a sensitive device credential, not a signed-in session. Its original 30-day deadline is checked by the server. Unchecking does not revoke existing trust; use the forget control after signing in. A short-lived sign-in transaction uses this tab’s session storage and is cleared on cancellation or sign-out.</p>
-        {credentials && <button type="button" disabled={snapshot.authBusy} className="mt-3 font-medium underline underline-offset-4 disabled:opacity-50" onClick={() => client?.restart(true)}>Remove local proof and use MFA</button>}
-      </details>
-    </div>
-    <a className="mt-4 inline-block text-sm font-medium underline underline-offset-4" href="https://www.frankmanu.com/">Return to the public website</a>
   </section>
 }
 

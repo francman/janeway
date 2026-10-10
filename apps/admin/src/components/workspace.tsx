@@ -71,7 +71,7 @@ export function Workspace({ page, children }: { page: WorkspacePage; children: R
         <div className="flex min-w-0 items-center gap-3">
           {authenticated && <button ref={menuButton} type="button" className="icon-button lg:hidden" aria-label="Open navigation" aria-expanded={menuOpen} aria-controls="mobile-navigation" onClick={() => { drawer.current?.showModal(); setMenuOpen(true) }}><Icon name="menu" className="h-5 w-5" /></button>}
           <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 text-sm">
-            <span className="whitespace-nowrap text-zinc-500 dark:text-zinc-400">{authenticated ? 'Workspace' : 'Frank Manu'}</span><span aria-hidden="true" className="text-zinc-400">/</span><span className="truncate font-medium">{authenticated ? pages[page].title : 'Dashboard'}</span>
+            {authenticated ? <span className="whitespace-nowrap text-zinc-500 dark:text-zinc-400">Workspace</span> : <a href="https://www.frankmanu.com/" className="whitespace-nowrap text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100">Frank Manu</a>}<span aria-hidden="true" className="text-zinc-400">/</span><span className="truncate font-medium">{authenticated ? pages[page].title : 'Dashboard'}</span>
           </nav>
         </div>
         <ThemeToggle />
