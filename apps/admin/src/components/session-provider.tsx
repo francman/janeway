@@ -26,7 +26,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const client = instance.current
       const update = () => setValue({ client, snapshot: client.getSnapshot(), configurationError: false })
       const unsubscribe = client.subscribe(update)
-      client.start()
       update()
       const onPageHide = () => {
         client.clear('expired')

@@ -18,11 +18,8 @@ const pages = {
   metrics: { title: 'Metrics', href: '/metrics/', icon: 'chart' },
 } as const
 
-const states: Record<Exclude<SessionStatus, 'authenticated' | 'login'>, { title: string; description: string; busy?: boolean }> = {
-  loading: { title: 'Opening your dashboard', description: 'Preparing your personal workspace.', busy: true },
-  verifying: { title: 'Checking your session', description: 'Sign-in completed. Confirming your account and this device.', busy: true },
-  'signing-out': { title: 'Signing out', description: 'Private data is cleared from this tab. Attempting session revocation, then returning to the public homepage.', busy: true },
-  expired: { title: 'Your session has ended', description: 'Private data has been cleared. Sign in again to continue. Your session cannot extend beyond eight hours or this device’s server expiry.' },
+const states: Record<Exclude<SessionStatus, 'authenticated' | 'login' | 'verifying' | 'signing-out'>, { title: string; description: string; busy?: boolean }> = {
+  expired: { title: 'Your session has ended', description: 'Private data has been cleared. Sign in again to continue. Sessions remain bounded to eight hours.' },
   denied: { title: 'Access has not been granted', description: 'Your account is not authorized for this dashboard. If you just completed enrollment, activation may still be pending.' },
   unavailable: { title: 'Your session could not be checked', description: 'The dashboard is temporarily unavailable. No private data is shown. Retry the check or sign out.' },
   error: { title: 'Sign-in could not be completed', description: 'Your workspace is not open. Start a new sign-in in this tab when you are ready.' },
@@ -82,7 +79,7 @@ export function Workspace({ page, children }: { page: WorkspacePage; children: R
           {snapshot.notice === 'trust-failed' && <p role="alert" className="panel mb-5 text-sm"><AuthErrorMessage code="trust-failed" /></p>}
           {snapshot.deviceStatus === 'error' && <div role="alert" className="panel mb-5 text-sm"><p>The server did not confirm that this browser was forgotten. Saved proof has not been removed. Retry, or sign out without claiming device revocation.</p>{snapshot.requestId && <p className="mt-2 break-all text-xs">Request ID: {snapshot.requestId}</p>}<Button type="button" className="mt-3" onClick={() => { void client?.forgetDevice() }}>Retry forgetting this browser</Button></div>}
           {children}
-        </> : snapshot.status === 'login' ? <LoginPanel /> : <SessionScreen />}
+        </> : snapshot.status === 'login' || snapshot.status === 'verifying' ? <LoginPanel /> : <SessionScreen />}
         </div>
         <footer className="mt-8 border-t border-zinc-200 pt-4 text-xs text-zinc-500 dark:border-zinc-800 dark:text-zinc-400"><p>Frank Manu</p></footer>
       </main>
@@ -106,7 +103,7 @@ export function Workspace({ page, children }: { page: WorkspacePage; children: R
 
 function SessionScreen() {
   const { snapshot, client } = useOwnerSession()
-  if (snapshot.status === 'authenticated' || snapshot.status === 'login') return null
+  if (snapshot.status === 'authenticated' || snapshot.status === 'login' || snapshot.status === 'verifying' || snapshot.status === 'signing-out') return null
   const state = states[snapshot.status]
   const retry = snapshot.status === 'unavailable'
   const denied = snapshot.status === 'denied'

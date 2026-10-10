@@ -23,7 +23,6 @@ export class DeviceStorage {
   private readonly values = new Map<string, string>()
   private sealed = false
   private revocationToken: string | null = null
-  private captureRevocation = false
   readonly recordKey: string
   private readonly prefix: string
 
@@ -34,12 +33,7 @@ export class DeviceStorage {
 
   async getItem(key: string): Promise<string | null> { return this.sealed ? null : this.values.get(key) ?? null }
   async setItem(key: string, value: string): Promise<void> {
-    if (this.sealed) {
-      // Only a logout already in progress may collect a late rotating token for
-      // revocation. This cell is never readable by Auth or written to storage.
-      if (this.captureRevocation && key.startsWith(this.prefix) && key.endsWith('.refreshToken')) this.revocationToken = value
-      return
-    }
+    if (this.sealed) return
     this.values.set(key, value)
   }
   async removeItem(key: string): Promise<void> { this.values.delete(key) }
@@ -49,7 +43,6 @@ export class DeviceStorage {
     if (!this.sealed && forSignOut) {
       const username = this.values.get(`${this.prefix}LastAuthUser`)
       this.revocationToken = username ? this.values.get(`${this.prefix}${username}.refreshToken`) ?? null : null
-      this.captureRevocation = true
     }
     this.sealed = true
     this.values.clear()
@@ -58,7 +51,6 @@ export class DeviceStorage {
   takeRevocationToken(): string | null {
     const token = this.revocationToken
     this.revocationToken = null
-    this.captureRevocation = false
     return token
   }
 

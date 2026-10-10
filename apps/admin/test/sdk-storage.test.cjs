@@ -69,6 +69,7 @@ test('real SDK in-flight token writes after sealing cannot repopulate the store'
   const refreshing = fetchAuthSession({ forceRefresh: true })
   await started.promise
   storage.seal(true)
+  assert.equal(storage.takeRevocationToken(), 'old-refresh')
   pending.resolve(new Response(JSON.stringify({ AuthenticationResult: { AccessToken: jwt({ sub: 'owner-sub', username, token_use: 'access', exp: now + 300, iat: now, auth_time: now }), RefreshToken: 'late-rotated-refresh', ExpiresIn: 300, TokenType: 'Bearer' } }), { status: 200, headers: { 'Content-Type': 'application/x-amz-json-1.1' } }))
   await refreshing
   // DefaultTokenStore re-reads LastAuthUser between awaited writes. It can write
@@ -78,7 +79,7 @@ test('real SDK in-flight token writes after sealing cannot repopulate the store'
     assert.equal(await storage.getItem(`${prefix}${name}.accessToken`), null)
     assert.equal(await storage.getItem(`${prefix}${name}.refreshToken`), null)
   }
-  assert.equal(storage.takeRevocationToken(), 'late-rotated-refresh')
+  assert.equal(storage.takeRevocationToken(), null)
   const current = await fetchAuthSession()
   assert.equal(current.tokens, undefined)
 })

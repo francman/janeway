@@ -89,7 +89,7 @@ function fixture(t) {
     client, state,
     setUser(value) { current = value }, setTransport(value) { transport = value }, setRefresh(value) { refresh = value },
     setSignIn(value) { signIn = value }, setTrust(value) { trust = value },
-    start: async (remember = false) => { client.start(); await client.signIn('owner@example.test', 'synthetic-password', remember) },
+    start: async (remember = false) => { await client.signIn('owner@example.test', 'synthetic-password', remember) },
   }
 }
 function nativeFixture() {
@@ -140,7 +140,7 @@ test('sealing is irreversible; late token writes never restore readable Auth sta
   assert.equal(await storage.getItem(`${prefix}${user.username}.accessToken`), null)
   assert.equal(await storage.getItem(`${prefix}${user.username}.refreshToken`), null)
   assert.throws(() => storage.hydrate('owner@example.test'))
-  assert.equal(storage.takeRevocationToken(), 'late-rotating-refresh')
+  assert.equal(storage.takeRevocationToken(), 'synthetic-refresh')
   await storage.setItem(`${prefix}${user.username}.refreshToken`, 'even-later')
   assert.equal(storage.takeRevocationToken(), null)
 })
@@ -227,20 +227,14 @@ test('cancel clears transactions immediately and again after late SDK challenge 
   assert.deepEqual(f.state.navigations, [config.origin + '/'])
 })
 
-test('logout seals memory, revokes the newest in-flight rotating token and goes to public homepage', async () => {
+test('logout immediately seals memory, starts current refresh-family revocation and goes to public homepage', async () => {
   const f = nativeFixture()
   await f.auth.signIn('owner@example.test', 'synthetic-password')
   await f.auth.trust(user, session)
-  const pending = deferred(), started = deferred()
-  f.sdk.fetchAuthSession = async () => { started.resolve(); await pending.promise; await f.storage.setItem(`${prefix}${user.username}.refreshToken`, 'newest-rotating-token'); return { tokens: {} } }
-  const refreshing = f.auth.refresh()
-  await started.promise
-  const signingOut = f.auth.signOut()
+  await f.auth.signOut()
   assert.equal(await f.storage.getItem(`${prefix}${user.username}.accessToken`), null)
-  pending.resolve()
-  await assert.rejects(refreshing)
-  await signingOut
-  assert.equal(JSON.parse(f.state.requests[0].options.body).Token, 'newest-rotating-token')
+  assert.equal(JSON.parse(f.state.requests[0].options.body).Token, 'synthetic-refresh')
+  assert.equal(f.state.requests[0].options.keepalive, true)
   assert.equal(f.state.requests[0].url, 'https://cognito-idp.us-east-1.amazonaws.com')
   assert.equal(f.persistent.length, 1)
   assert.equal(f.transactions.length, 0)
@@ -485,8 +479,6 @@ test('device deletion without no-store or exact 204 cannot claim success', async
 
 test('reload opens an idle login form, never a persisted authenticated session or automatic redirect', t => {
   const f = fixture(t)
-  f.client.start()
-  f.client.start()
   assert.equal(f.client.getSnapshot().status, 'login')
   assert.equal(f.client.getSnapshot().flow.kind, 'credentials')
   assert.equal(f.state.signIns, 0)

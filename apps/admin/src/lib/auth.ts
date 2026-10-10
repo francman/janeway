@@ -199,29 +199,19 @@ export class NativeAuth implements AuthPort {
   }
   async signOut(): Promise<void> {
     this.clear(true)
-    let timer: ReturnType<typeof setTimeout> | undefined
-    try {
-      // SDK requests cannot be cancelled. Wait only a bounded time for a refresh
-      // already in flight; its sealed write can update the revocation-only cell.
-      await Promise.race([this.active, new Promise<void>(resolve => { timer = setTimeout(resolve, 6_000) })])
-      clearTimeout(timer)
-      const token = this.storage.takeRevocationToken()
-      if (token) {
-        // Documented Cognito API, not an OAuth/hosted-login endpoint. SDK signOut
-        // requires readable tokens; reopening its global store here is unsafe.
-        await this.environment.transport(new URL(this.config.authority).origin, {
-          method: 'POST', credentials: 'omit', cache: 'no-store', redirect: 'error',
-          headers: { 'Content-Type': 'application/x-amz-json-1.1', 'X-Amz-Target': 'AWSCognitoIdentityProviderService.RevokeToken' },
-          body: JSON.stringify({ ClientId: this.config.clientId, Token: token }), signal: AbortSignal.timeout(4_000),
-        })
-      }
-    } catch { /* Revocation is attempted, never claimed as confirmed on failure. */ }
-    finally {
-      clearTimeout(timer)
-      this.storage.takeRevocationToken()
-      this.clearTransactions()
-      this.environment.navigate('https://www.frankmanu.com/')
+    const token = this.storage.takeRevocationToken()
+    if (token) {
+      // Start the documented best-effort family revocation before navigation.
+      // keepalive permits this small request to continue while the public page loads.
+      void this.environment.transport(new URL(this.config.authority).origin, {
+        method: 'POST', credentials: 'omit', cache: 'no-store', redirect: 'error',
+        keepalive: true,
+        headers: { 'Content-Type': 'application/x-amz-json-1.1', 'X-Amz-Target': 'AWSCognitoIdentityProviderService.RevokeToken' },
+        body: JSON.stringify({ ClientId: this.config.clientId, Token: token }),
+      }).catch(() => { /* Remote revocation is best-effort; local state is sealed. */ })
     }
+    this.clearTransactions()
+    this.environment.navigate('https://www.frankmanu.com/')
   }
 }
 

@@ -23,9 +23,9 @@ export function ThemeToggle() {
   }, [])
 
   return <button type="button" className="icon-button rounded-full" aria-label={`Switch to ${dark ? 'light' : 'dark'} theme`} onClick={() => {
-    const next = !dark
-    setDark(next)
+    const next = !document.documentElement.classList.contains('dark')
     document.documentElement.classList.toggle('dark', next)
+    setDark(next)
     try { localStorage.setItem('janeway-admin.theme', next ? 'dark' : 'light') } catch { /* No auth data uses browser storage. */ }
   }}><Icon name={dark ? 'moon' : 'sun'} className="h-5 w-5 text-teal-700 dark:text-teal-400" /></button>
 }

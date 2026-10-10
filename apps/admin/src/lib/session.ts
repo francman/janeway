@@ -2,7 +2,7 @@ import { ApiError, ownerRequest, parseResume, parseSession, type DeviceErrorCode
 import type { AdminConfig } from './config'
 import { AuthFailure, authFailure, type AuthErrorCode, type AuthPort, type AuthStep, type AuthUser } from './auth'
 
-export type SessionStatus = 'loading' | 'login' | 'verifying' | 'authenticated' | 'signing-out' | 'expired' | 'denied' | 'unavailable' | 'error'
+export type SessionStatus = 'login' | 'verifying' | 'authenticated' | 'signing-out' | 'expired' | 'denied' | 'unavailable' | 'error'
 export interface SessionSnapshot {
   status: SessionStatus
   session: OwnerSession | null
@@ -21,7 +21,7 @@ export interface SessionSnapshot {
 const MAX_SESSION_SECONDS = 8 * 60 * 60
 const REFRESH_LEAD_SECONDS = 60
 export const initialSnapshot: SessionSnapshot = {
-  status: 'loading', session: null, resume: null, resumeStatus: 'idle', flow: { kind: 'credentials' },
+  status: 'login', session: null, resume: null, resumeStatus: 'idle', flow: { kind: 'credentials' },
   authBusy: false, deviceTrusted: false, deviceStatus: 'idle',
 }
 
@@ -71,12 +71,9 @@ export class OwnerSessionClient {
     for (const listener of this.listeners) listener()
   }
 
-  start(): void {
-    if (this.snapshot.status === 'loading') this.publish({ status: 'login' })
-  }
   restart(freshMfa = false): void {
     if (freshMfa) this.auth.forgetLocal()
-    this.clear('loading')
+    this.clear('login')
     this.auth.restart()
   }
   cancel(): void { this.restart() }
@@ -119,7 +116,7 @@ export class OwnerSessionClient {
         this.validateUser(result.user)
         this.user = result.user
         this.deadline = Math.min(this.now() + MAX_SESSION_SECONDS, result.user.authTime + MAX_SESSION_SECONDS)
-        this.publish({ status: 'verifying', flow: { kind: 'credentials' }, authBusy: false })
+        this.publish({ status: 'verifying', flow: { kind: 'credentials' }, authBusy: true })
         await this.checkSession()
       } else {
         this.publish({ flow: result, authBusy: false })
@@ -221,7 +218,7 @@ export class OwnerSessionClient {
   private async verifySession(): Promise<void> {
     if (!this.user) return
     const generation = this.generation
-    if (this.snapshot.status === 'unavailable') this.publish({ status: 'verifying', requestId: undefined })
+    if (this.snapshot.status === 'unavailable') this.publish({ status: 'verifying', authBusy: true, requestId: undefined })
     try {
       const response = await this.request('session')
       if (generation !== this.generation || !this.user) return
@@ -240,14 +237,14 @@ export class OwnerSessionClient {
       }
       if (generation !== this.generation) return
       if (this.now() >= this.deadline || this.now() >= session.expiresAt) throw new ApiError('expired')
-      this.publish({ status: 'authenticated', session, deviceTrusted, requestId: undefined })
+      this.publish({ status: 'authenticated', session, deviceTrusted, authBusy: false, requestId: undefined })
       this.schedule(session.expiresAt)
     } catch (error) {
       if (generation !== this.generation) return
       const failure = error instanceof ApiError ? error : new ApiError('unavailable')
       if (failure.kind !== 'unavailable') this.reject(failure)
       else {
-        this.publish({ status: 'unavailable', session: null, resume: null, resumeStatus: 'idle', requestId: failure.requestId })
+        this.publish({ status: 'unavailable', session: null, resume: null, resumeStatus: 'idle', authBusy: false, requestId: failure.requestId })
         clearTimeout(this.timer)
         this.timer = setTimeout(() => this.clear('expired'), Math.max(0, Math.min(this.user!.expiresAt, this.deadline) - this.now()) * 1000)
       }
