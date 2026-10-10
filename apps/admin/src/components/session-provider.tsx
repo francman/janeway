@@ -27,14 +27,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const update = () => setValue({ client, snapshot: client.getSnapshot(), configurationError: false })
       const unsubscribe = client.subscribe(update)
       update()
+      void client.restore()
       const onPageHide = () => {
-        client.clear('expired')
+        client.suspend()
       }
       const onVisible = () => {
         if (document.visibilityState === 'visible') void client.checkSession()
       }
       const onPageShow = (event: PageTransitionEvent) => {
-        if (event.persisted) client.clear('expired')
+        if (event.persisted) window.location.reload()
       }
       window.addEventListener('pagehide', onPageHide)
       window.addEventListener('pageshow', onPageShow)

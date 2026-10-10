@@ -252,11 +252,14 @@ The operator and version/recovery contracts are in janeway-infra's runbook;
   Amplify Auth SRP APIs for sign-in, initial password replacement and TOTP
   setup/challenges. Password reset is an AWS Cognito operator action, not a
   public dashboard link. No signup, client secret or IAM browser keys.
-- Access/ID/rotating-refresh tokens and private state stay in memory. The SDK's
-  short-lived sign-in challenge transaction uses per-tab sessionStorage;
-  passwords, one-time codes and QR seeds are not persisted. Completion, explicit
-  cancellation and logout clear transaction state. A terminal retry reloads the
-  document explicitly, rather than reopening a sealed SDK store.
+- By owner approval, access/ID/rotating-refresh tokens and the SDK session
+  checkpoint persist in per-tab `sessionStorage` so refresh can restore sign-in.
+  This storage is JavaScript-accessible: XSS can expose bearer tokens; it is not
+  an HttpOnly session. No bearer tokens go in `localStorage`. Private API data,
+  uploads and preview capabilities remain memory-only.
+  The SDK's short-lived sign-in challenge transaction also uses per-tab
+  `sessionStorage`; account passwords, one-time codes and QR seeds are not
+  persisted. Completion and logout clear challenge state.
 - **Trust this device** is opt-in and intended only for personal browsers.
   Confirmed device key/group/SRP proof and its scoped identity record may persist
   alongside the theme preference. This is a sensitive possession credential,
@@ -269,11 +272,14 @@ The operator and version/recovery contracts are in janeway-infra's runbook;
   request. Editing browser state cannot restore a deleted/revoked device.
   Device-auth and refreshed tokens lack the native user-management scope needed
   to enroll replacement devices without fresh MFA.
-- Five-minute access tokens refresh serially within an eight-hour session ceiling.
-  Reload opens the custom login form. **Sign
-  out** clears private state, makes a bounded refresh-family revocation attempt
-  and returns directly to **https://www.frankmanu.com/**. There is no signed-out
-  landing page or hosted-login callback.
+- Five-minute access tokens refresh serially within the original eight-hour
+  authentication ceiling; reloading does not extend it. Reload restores the
+  tab checkpoint only after SDK validation and server authorization of
+  `GET /v1/session`, before displaying private data. Invalid, expired or revoked
+  sessions return to login. **Sign out** clears the checkpoint and private state,
+  makes a bounded refresh-family revocation attempt and returns directly to
+  **https://www.frankmanu.com/**. There is no signed-out landing page or
+  hosted-login callback.
 - Sign-out preserves opted-in device proof. **Forget this browser and sign out**
   first requires confirmed server deletion, then removes local proof and signs
   out. Failed deletion does not pretend the server forgot the device. The
@@ -319,29 +325,38 @@ password. Pool/client/API values come from `JanewayAdminStack`; never embed the
 immutable owner subject or tokens. Native authentication connects to the regional
 Cognito API, not the retired managed-login domain.
 
-Admin releases use **Actions → Deploy owner dashboard**, manually dispatched
-from **`admin-deploy`**. Its build job has no cloud credentials/OIDC permission.
-The `admin-production` deployment environment permits only that branch, requires
-Frank's review, and disallows admin bypass. The OIDC role can create/start/read
-deployments only for the separate `janeway-admin` app's `production` branch.
-It cannot change infrastructure, Cognito or content.
+Admin releases run locally using an existing AWS SSO profile:
+
+```sh
+aws sso login --profile AdministratorAccess-486207805298
+npm run release:admin -- --profile AdministratorAccess-486207805298
+```
+
+The command reads public configuration from `JanewayAdminStack`, checks the
+production account and Git-disconnected static app, then builds, packages,
+uploads to its `production` branch and observes deployment before the public admin
+smoke. It releases the current working tree; recorded HEAD is informational,
+not a clean-tree or approval gate. No GitHub workflow, OIDC deployment role,
+dashboard build approval or `admin-deploy` branch is required.
 
 `scripts/prepare-admin-release.cjs` packages the exact static export and records
 its commit/digest. It supplies `customHttp.yml` with build-specific inline-script
 hashes, no framing/referrer leakage, and narrowly scoped connections.
 Do not add `unsafe-inline`/`unsafe-eval` to script policy to fix a broken build.
-`scripts/deploy-admin.cjs` verifies the selected commit/artifact/account/role,
-uploads without logging its signed URL, and observes the Amplify job.
+`scripts/deploy-admin.cjs` verifies the artifact digest and production account/app,
+uploads without logging its signed URL, and observes the Amplify job. If an
+operation fails or its outcome is unknown, inspect the reported job (or the
+app's production jobs when no ID is available) before retrying.
 `scripts/smoke-admin-public.cjs` verifies real route delivery, hydration hashes,
 anonymous/invalid-token denial on reads and device deletion, exact-origin CORS,
 and removal of callback/signed-out routes. Real MFA, remembered/untrusted devices,
 recovery/forgetting, public-homepage logout, desktop/mobile interactions and the
 public-site smoke are additional acceptance gates, not implied by an uploaded zip.
 
-Changes to shared/public code still require a public `deploy`-branch release.
-Do not point the public app at the admin export or give the admin deployment role
-public-site permissions. Restore a reviewed **native-auth-compatible** admin
-revision through the protected workflow; an old hosted-login artifact is not
+The public app still auto-builds from `deploy`; changes to shared/public code
+require that separate release. Do not point the public app at the admin export.
+To roll back the dashboard, select a reviewed **native-auth-compatible** revision
+and run the same local release command; an old hosted-login artifact is not
 compatible with the cutover. Do not change the owner subject or résumé pointer
 to roll back UI. Owner recovery, resource/cost inventory and the permanent
 Cognito schema addition are documented in `janeway-infra`'s

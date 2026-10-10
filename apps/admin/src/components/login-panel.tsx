@@ -49,11 +49,13 @@ export function LoginPanel() {
   const { snapshot, client } = useOwnerSession()
   const [trust, setTrust] = useState(false)
   const [formError, setFormError] = useState('')
+  const [passwordVisible, setPasswordVisible] = useState(false)
   const flow = snapshot.flow
   const credentials = flow.kind === 'credentials'
   const newPassword = flow.kind === 'new-password'
   const code = flow.kind === 'totp'
   const title = credentials ? 'Sign in' : newPassword ? 'Choose your password' : flow.secret ? 'Set up your authenticator' : 'Verify it is you'
+  useEffect(() => { setPasswordVisible(false) }, [flow.kind, snapshot.status])
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -69,7 +71,8 @@ export function LoginPanel() {
     const value = String(values.get('code') ?? '').trim()
     // Sensitive fields are uncontrolled and cleared as soon as submitted. They
     // never enter React state, storage, URLs, telemetry, or an owner API body.
-    for (const input of form.querySelectorAll<HTMLInputElement>('input[type="password"], input[name="code"]')) input.value = ''
+    for (const input of form.querySelectorAll<HTMLInputElement>('input[name="password"], input[name="confirm-password"], input[name="code"]')) input.value = ''
+    setPasswordVisible(false)
     if (credentials) void client.signIn(client.loginId, password, trust)
     else if (flow.kind === 'totp') void client.confirm(value)
     else if (flow.kind === 'new-password') {
@@ -82,7 +85,6 @@ export function LoginPanel() {
   return <section className="panel mx-auto mt-4 max-w-lg sm:mt-8" aria-busy={snapshot.authBusy}>
     <div className="flex justify-center"><ThemeToggle /></div>
     {credentials ? <h1 className="sr-only">Sign in</h1> : <h1 className="mt-5 text-2xl font-semibold tracking-tight">{title}</h1>}
-    {snapshot.status === 'verifying' && <p role="status" className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">Checking your session…</p>}
     {!credentials && <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">{flow.kind === 'new-password' ? 'Replace your temporary password to continue enrollment.' : 'Enter a fresh six-digit code from your authenticator app.'}</p>}
     {(formError || snapshot.authError) && <p role="alert" className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">{formError || (snapshot.authError && errors[snapshot.authError])}</p>}
     <form key={flow.kind} onSubmit={submit} className={`${credentials ? 'mt-8' : 'mt-6'} space-y-5`}>
@@ -90,15 +92,18 @@ export function LoginPanel() {
         {credentials && <input name="username" type="text" value={client?.loginId ?? ''} readOnly tabIndex={-1} autoComplete="username" aria-hidden="true" className="sr-only" />}
         {flow.kind === 'totp' && flow.secret && flow.uri && <TotpSetup uri={flow.uri} secret={flow.secret} />}
         {code && <div><label htmlFor="auth-code" className="text-sm font-medium">Authenticator code</label><input id="auth-code" name="code" className="auth-input font-mono tracking-widest" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required aria-describedby="code-help" /><p id="code-help" className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">If you just used a code, wait until the next one appears. Check that your phone’s clock is set automatically.</p></div>}
-        {(credentials || newPassword) && <div><label htmlFor="password" className="text-sm font-medium">{newPassword ? 'New password' : 'Password'}</label><input id="password" name="password" type="password" className="auth-input" autoComplete={newPassword ? 'new-password' : 'current-password'} required maxLength={256} /></div>}
+        {(credentials || newPassword) && <div>
+          <label htmlFor="password" className={credentials ? 'block text-center text-xl font-semibold' : 'text-sm font-medium'}>{newPassword ? 'New password' : 'Password'}</label>
+          <div className="relative">
+            <input id="password" name="password" type={credentials && passwordVisible ? 'text' : 'password'} className={credentials ? 'auth-input pr-20 text-base' : 'auth-input'} autoComplete={newPassword ? 'new-password' : 'current-password'} required maxLength={256} />
+            {credentials && <button type="button" aria-controls="password" aria-label={passwordVisible ? 'Hide password' : 'Show password'} aria-pressed={passwordVisible} onClick={() => setPasswordVisible(visible => !visible)} className="absolute inset-y-0 right-0 mt-2 min-w-[64px] rounded-r-lg px-3 text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100">{passwordVisible ? 'Hide' : 'Show'}</button>}
+          </div>
+        </div>}
         {newPassword && <div><label htmlFor="confirm-password" className="text-sm font-medium">Confirm new password</label><input id="confirm-password" name="confirm-password" type="password" className="auth-input" autoComplete="new-password" required maxLength={256} /></div>}
         {flow.kind === 'new-password' && flow.attributes.map(attribute => <div key={attribute}><label htmlFor={`attribute-${attribute}`} className="text-sm font-medium">{attribute.replaceAll('_', ' ')}</label><input id={`attribute-${attribute}`} name={`attribute-${attribute}`} className="auth-input" type={attribute === 'email' ? 'email' : 'text'} required /></div>)}
         {credentials && <div className="rounded-xl bg-zinc-50 p-4 dark:bg-zinc-800/60"><label className="flex items-center gap-3 text-sm font-medium"><input type="checkbox" checked={trust} onChange={event => setTrust(event.target.checked)} className="h-4 w-4 accent-teal-700" />Trust this device</label></div>}
         <Button type="submit" className="min-h-11 w-full">{snapshot.authBusy ? 'Please wait…' : credentials ? 'Sign in' : 'Continue'}</Button>
       </fieldset>
-      <div className="flex flex-wrap gap-x-5 gap-y-3 text-sm">
-        {(!credentials || snapshot.authBusy) && <button type="button" className="font-medium underline underline-offset-4" onClick={() => client?.cancel()}>Cancel and start over</button>}
-      </div>
     </form>
   </section>
 }

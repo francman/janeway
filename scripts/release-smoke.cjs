@@ -449,7 +449,11 @@ async function runSmoke({ siteUrl, cdnUrl, config, outDir, appRevision, infraRev
     report.operationalError = failureDetail(error)
   } finally {
     if (browser) {
-      try { await browser.close() } catch { report.operationalError = 'Browser cleanup failed.' }
+      try {
+        // Finish response disposal before closing the context it depends on.
+        for (const activeContext of browser.contexts()) await activeContext.unrouteAll({ behavior: 'wait' })
+        await browser.close()
+      } catch { report.operationalError = 'Browser cleanup failed.' }
     }
   }
   if (unexpectedRedirect) report.operationalError = 'Browser attempted a redirect; redirects were blocked without following their targets.'

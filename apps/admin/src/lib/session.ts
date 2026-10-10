@@ -41,6 +41,7 @@ export class OwnerSessionClient {
   private refreshing: Promise<AuthUser> | null = null
   private checking: Promise<void> | null = null
   private loadingResume: Promise<void> | null = null
+  private restoration: Promise<void> | null = null
   private trustRequested = false
   private readonly requests = new Set<AbortController>()
 
@@ -66,7 +67,7 @@ export class OwnerSessionClient {
     for (const listener of this.listeners) listener()
   }
 
-  clear(status: SessionStatus, requestId?: string, deviceError?: DeviceErrorCode): void {
+  clear(status: SessionStatus, requestId?: string, deviceError?: DeviceErrorCode, preserveCheckpoint = false): void {
     this.generation++
     this.user = null
     this.deadline = 0
@@ -74,9 +75,38 @@ export class OwnerSessionClient {
     clearTimeout(this.timer)
     for (const request of this.requests) request.abort()
     this.requests.clear()
-    this.auth.clear(status === 'signing-out')
+    this.auth.clear(status === 'signing-out', preserveCheckpoint)
     this.snapshot = { ...initialSnapshot, status, requestId, deviceError }
     for (const listener of this.listeners) listener()
+  }
+
+  suspend(): void { this.clear('expired', undefined, undefined, true) }
+
+  restore = (): Promise<void> => {
+    if (!this.restoration) this.restoration = this.restoreSession()
+    return this.restoration
+  }
+  private async restoreSession(): Promise<void> {
+    if (this.snapshot.status !== 'login' || this.snapshot.authBusy) return
+    const generation = this.generation
+    this.publish({ authBusy: true, authError: undefined })
+    try {
+      const user = await this.auth.restore()
+      if (generation !== this.generation) return
+      if (!user) {
+        this.publish({ authBusy: false })
+        return
+      }
+      this.validateUser(user)
+      this.user = user
+      this.deadline = Math.min(this.now() + MAX_SESSION_SECONDS, user.authTime + MAX_SESSION_SECONDS)
+      this.publish({ status: 'verifying', flow: { kind: 'credentials' }, authBusy: true })
+      await this.checkSession()
+    } catch (error) {
+      if (generation !== this.generation) return
+      if (error instanceof ApiError) this.reject(error)
+      else this.clear('expired')
+    }
   }
 
   restart(freshMfa = false): void {
@@ -84,7 +114,6 @@ export class OwnerSessionClient {
     this.clear('login')
     this.auth.restart()
   }
-  cancel(): void { this.restart() }
 
   async signIn(loginId: string, password: string, trust: boolean): Promise<void> {
     if (this.snapshot.status !== 'login' || this.snapshot.authBusy || this.snapshot.flow.kind !== 'credentials') return

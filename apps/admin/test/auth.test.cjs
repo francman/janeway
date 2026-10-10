@@ -17,7 +17,7 @@ function load(name) {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
   }).outputText
   const context = vm.createContext({
-    module, exports: module.exports, URL, AbortController, AbortSignal, Response, fetch, setTimeout, clearTimeout,
+    module, exports: module.exports, URL, AbortController, AbortSignal, Response, TextEncoder, fetch, setTimeout, clearTimeout,
     require(specifier) { return specifier.startsWith('./') ? load(specifier.slice(2)) : sourceRequire(specifier) },
   })
   new vm.Script(code, { filename }).runInContext(context)
@@ -61,24 +61,28 @@ class Storage {
   getItem(key) { return this.values.get(key) ?? null }
   setItem(key, value) { this.values.set(key, value) }
   removeItem(key) { this.values.delete(key) }
+  key(index) { return [...this.values.keys()][index] ?? null }
   clear() { this.values.clear() }
 }
 async function populate(storage, owner = user) {
   await storage.setItem(prefix + 'LastAuthUser', owner.username)
-  for (const [key, value] of Object.entries({ accessToken: owner.accessToken, idToken: 'synthetic-id', refreshToken: 'synthetic-refresh', deviceKey: owner.deviceKey, deviceGroupKey: 'device-group', randomPasswordKey: 'random-device-password' })) {
+  for (const [key, value] of Object.entries({ accessToken: owner.accessToken, idToken: 'synthetic-id', refreshToken: 'synthetic-refresh', deviceKey: owner.deviceKey, deviceGroupKey: 'device-group', randomPasswordKey: 'random-device-password', clockDrift: '0' })) {
     await storage.setItem(`${prefix}${owner.username}.${key}`, value)
   }
 }
 function fixture(t) {
-  const state = { now: 1000, refreshes: 0, signIns: 0, clears: 0, requests: [], signOuts: 0, trusts: 0, forgotten: 0, saved: false, restarts: 0 }
+  const state = { now: 1000, refreshes: 0, restores: 0, signIns: 0, clears: 0, requests: [], signOuts: 0, trusts: 0, forgotten: 0, saved: false, restarts: 0, preserveCheckpoint: false }
   let current = { ...user }
   let refresh = async () => ({ ...current, accessToken: 'synthetic-rotated', expiresAt: state.now + 300, loginKind: 'refresh' })
   let signIn = async () => ({ kind: 'done', user: current })
+  let restore = async () => null
   let trust = async () => { state.saved = true; return true }
   let transport = async url => response(url.endsWith('/session') ? { ...session, expiresAt: state.now + 300 } : url.endsWith('/device') ? null : resume, url.endsWith('/device') ? 204 : 200)
   const auth = {
     signIn: async () => { state.signIns++; return signIn() }, confirm: async () => signIn(),
-    refresh: async () => { state.refreshes++; return refresh() }, clear: () => { state.clears++ },
+    restore: async () => { state.restores++; return restore() },
+    refresh: async () => { state.refreshes++; return refresh() },
+    clear: (_forSignOut, preserveCheckpoint = false) => { state.clears++; state.preserveCheckpoint = preserveCheckpoint },
     signOut: async () => { state.signOuts++ }, restart: () => { state.restarts++ },
     isTrusted: () => state.saved, trust: async () => { state.trusts++; return trust() }, forgetLocal: () => { state.forgotten++; state.saved = false },
   }
@@ -87,19 +91,18 @@ function fixture(t) {
   return {
     client, state,
     setUser(value) { current = value }, setTransport(value) { transport = value }, setRefresh(value) { refresh = value },
-    setSignIn(value) { signIn = value }, setTrust(value) { trust = value },
+    setSignIn(value) { signIn = value }, setRestore(value) { restore = value }, setTrust(value) { trust = value },
     start: async (remember = false) => { await client.signIn('owner@example.test', 'synthetic-password', remember) },
   }
 }
-function nativeFixture() {
-  const persistent = new Storage(), transactions = new Storage()
-  const storage = new DeviceStorage(config, persistent, () => 1000_000)
-  const state = { navigations: [], requests: [], remembers: 0 }
-  const token = { payload: { token_use: 'access', username: user.username, sub: user.sub, auth_time: user.authTime, exp: user.expiresAt, iss: user.issuer, client_id: user.clientId, scope: user.scope, device_key: user.deviceKey, janeway_login_kind: 'fresh' }, toString: () => user.accessToken }
+function nativeFixture({ persistent = new Storage(), transactions = new Storage(), now = () => 1000 } = {}) {
+  const storage = new DeviceStorage(config, persistent, transactions, now)
+  const state = { navigations: [], requests: [], remembers: 0, fetches: [], owner: { ...user } }
+  const token = owner => ({ payload: { token_use: 'access', username: owner.username, sub: owner.sub, auth_time: owner.authTime, exp: owner.expiresAt, iss: owner.issuer, client_id: owner.clientId, scope: owner.scope, device_key: owner.deviceKey, janeway_login_kind: owner.loginKind }, toString: () => owner.accessToken })
   const sdk = {
     signIn: async () => { await populate(storage); return { isSignedIn: true, nextStep: { signInStep: 'DONE' } } },
     confirmSignIn: async () => ({ isSignedIn: false, nextStep: { signInStep: 'CONFIRM_SIGN_IN_WITH_TOTP_CODE' } }),
-    fetchAuthSession: async () => ({ tokens: { accessToken: token } }),
+    fetchAuthSession: async options => { state.fetches.push(options); return { tokens: { accessToken: token(state.owner) } } },
     rememberDevice: async () => { state.remembers++ },
   }
   const environment = { transactions, navigate: url => state.navigations.push(url), transport: async (url, options) => { state.requests.push({ url, options }); return response({}) } }
@@ -107,9 +110,9 @@ function nativeFixture() {
   return { auth, storage, persistent, transactions, state, sdk, environment }
 }
 
-test('all SDK keys are memory-default and only explicit confirmed device promotion persists', async () => {
+test('SDK writes stay memory-first and localStorage persists only explicitly promoted confirmed device proof', async () => {
   const persistent = new Storage()
-  const storage = new DeviceStorage(config, persistent, () => 1000_000)
+  const storage = new DeviceStorage(config, persistent)
   await populate(storage)
   await storage.setItem('unknownSDKKey', 'synthetic-secret')
   assert.equal(persistent.length, 0)
@@ -118,7 +121,7 @@ test('all SDK keys are memory-default and only explicit confirmed device promoti
   assert.deepEqual(Object.keys(record).sort(), ['version', 'poolId', 'clientId', 'username', 'sub', 'loginId', 'deviceKey', 'deviceGroupKey', 'randomPasswordKey'].sort())
   assert.equal(record.version, 2)
   assert.ok(!JSON.stringify(record).includes('synthetic-'))
-  const reloaded = new DeviceStorage(config, persistent, () => 1001_000)
+  const reloaded = new DeviceStorage(config, persistent)
   reloaded.hydrate('owner@example.test')
   assert.equal(await reloaded.getItem(`${prefix}${user.username}.deviceKey`), user.deviceKey)
   assert.equal(await reloaded.getItem(`${prefix}LastAuthUser`), null)
@@ -129,17 +132,191 @@ test('all SDK keys are memory-default and only explicit confirmed device promoti
 })
 
 test('sealing is irreversible; late token writes never restore readable Auth state', async () => {
-  const storage = new DeviceStorage(config, new Storage(), () => 1000_000)
+  const tab = new Storage()
+  const storage = new DeviceStorage(config, new Storage(), tab, () => 1000)
   await populate(storage)
+  storage.checkpoint(user.authTime)
   storage.seal(true)
   await storage.setItem(`${prefix}${user.username}.accessToken`, 'late-access')
   await storage.setItem(`${prefix}${user.username}.refreshToken`, 'late-rotating-refresh')
   assert.equal(await storage.getItem(`${prefix}${user.username}.accessToken`), null)
   assert.equal(await storage.getItem(`${prefix}${user.username}.refreshToken`), null)
+  storage.checkpoint(user.authTime)
+  assert.equal(tab.length, 0)
   assert.throws(() => storage.hydrate('owner@example.test'))
   assert.equal(storage.takeRevocationToken(), 'synthetic-refresh')
   await storage.setItem(`${prefix}${user.username}.refreshToken`, 'even-later')
   assert.equal(storage.takeRevocationToken(), null)
+})
+
+test('tab checkpoints contain only the configured canonical SDK session and never write bearer tokens to localStorage', async () => {
+  const tab = new Storage(), persistent = new Storage()
+  const storage = new DeviceStorage(config, persistent, tab, () => 1000)
+  await populate(storage)
+  for (const key of ['accountPassword', 'signInDetails', 'qrSeed', 'ownerMetadata', 'sourcePdf']) {
+    await storage.setItem(`${prefix}${user.username}.${key}`, 'excluded-secret')
+  }
+  await storage.setItem(`${prefix}other-owner.accessToken`, 'other-owner-token')
+  await storage.setItem('CognitoIdentityServiceProvider.otherclient.LastAuthUser', 'other-client')
+  assert.equal(tab.length, 0)
+  storage.checkpoint(user.authTime)
+  const record = JSON.parse(tab.getItem(storage.sessionKey))
+  assert.equal(record.authTime, user.authTime)
+  assert.equal(record.expiresAt, user.authTime + 8 * 3600)
+  assert.deepEqual(Object.keys(record.values).sort(), [
+    prefix + 'LastAuthUser',
+    ...['accessToken', 'idToken', 'refreshToken', 'deviceKey', 'deviceGroupKey', 'randomPasswordKey', 'clockDrift'].map(key => `${prefix}${user.username}.${key}`),
+  ].sort())
+  assert.equal(persistent.length, 0)
+  assert.ok(!JSON.stringify(record).includes('excluded-secret'))
+  assert.ok(!JSON.stringify(record).includes('other-owner-token'))
+  const reloaded = new DeviceStorage(config, persistent, tab, () => 1001)
+  assert.equal(reloaded.restore(), true)
+  assert.equal(await reloaded.getItem(`${prefix}${user.username}.accessToken`), user.accessToken)
+  assert.equal(await reloaded.getItem(`${prefix}${user.username}.refreshToken`), 'synthetic-refresh')
+  assert.equal(reloaded.confirmed(user.username, user.deviceKey), true)
+  assert.equal(reloaded.isSaved(user.username, user.sub, user.deviceKey), false)
+  assert.equal(persistent.length, 0)
+})
+
+test('malformed, wrong-client, extra-key, oversized and expired tab records are discarded', async () => {
+  const tab = new Storage()
+  const storage = new DeviceStorage(config, null, tab, () => 1000)
+  await populate(storage)
+  storage.checkpoint(user.authTime)
+  const valid = JSON.parse(tab.getItem(storage.sessionKey))
+  for (const value of [
+    null, { ...valid, version: 2 }, { ...valid, clientId: 'wrong-client' }, { ...valid, poolId: 'wrong-pool' },
+    { ...valid, owner: { sub: user.sub } }, { ...valid, expiresAt: valid.expiresAt + 1 },
+    { ...valid, authTime: 1061, expiresAt: 1061 + 8 * 3600 },
+    { ...valid, values: { ...valid.values, unknownKey: 'must-not-hydrate' } },
+    { ...valid, values: { ...valid.values, [`${prefix}${user.username}.deviceKey`]: '' } },
+    { ...valid, values: { ...valid.values, [`${prefix}${user.username}.accessToken`]: '\u754c'.repeat(25_000) } },
+  ]) {
+    tab.setItem(storage.sessionKey, JSON.stringify(value))
+    const reloaded = new DeviceStorage(config, null, tab, () => 1000)
+    assert.equal(reloaded.restore(), false)
+    assert.equal(await reloaded.getItem(prefix + 'LastAuthUser'), null)
+    assert.equal(tab.getItem(storage.sessionKey), null)
+  }
+  tab.setItem(storage.sessionKey, '{broken')
+  assert.equal(new DeviceStorage(config, null, tab, () => 1000).restore(), false)
+  tab.setItem(storage.sessionKey, JSON.stringify(valid))
+  const boundary = new DeviceStorage(config, null, tab, () => valid.expiresAt)
+  assert.equal(boundary.restore(), false)
+  assert.equal(tab.getItem(storage.sessionKey), null)
+})
+
+test('rotation preserves the original eight-hour deadline and never checkpoints an extended auth_time', async () => {
+  const tab = new Storage()
+  let now = 1000
+  const storage = new DeviceStorage(config, null, tab, () => now)
+  await populate(storage)
+  storage.checkpoint(user.authTime)
+  now = user.authTime + 8 * 3600 - 1
+  await storage.setItem(`${prefix}${user.username}.refreshToken`, 'rotated-refresh')
+  storage.checkpoint(user.authTime)
+  const record = JSON.parse(tab.getItem(storage.sessionKey))
+  assert.equal(record.expiresAt, user.authTime + 8 * 3600)
+  assert.equal(record.values[`${prefix}${user.username}.refreshToken`], 'rotated-refresh')
+  assert.throws(() => storage.checkpoint(now))
+  assert.equal(tab.getItem(storage.sessionKey), null)
+  now++
+  assert.throws(() => storage.checkpoint(user.authTime))
+  assert.equal(tab.getItem(storage.sessionKey), null)
+})
+
+test('unavailable tab storage and over-size checkpoints retain only the usable memory session', async () => {
+  const tab = new Storage()
+  const storage = new DeviceStorage(config, null, tab, () => 1000)
+  await populate(storage)
+  storage.checkpoint(user.authTime)
+  await storage.setItem(`${prefix}${user.username}.idToken`, '\u754c'.repeat(25_000))
+  storage.checkpoint(user.authTime)
+  assert.equal(tab.getItem(storage.sessionKey), null)
+  assert.equal(await storage.getItem(`${prefix}${user.username}.accessToken`), user.accessToken)
+  tab.setItem = () => { throw new Error('Storage unavailable') }
+  await storage.removeItem(`${prefix}${user.username}.idToken`)
+  storage.checkpoint(user.authTime)
+  assert.equal(await storage.getItem(`${prefix}${user.username}.refreshToken`), 'synthetic-refresh')
+})
+
+test('reload sealing preserves only the last settled checkpoint; later writes and logout cannot resurrect it', async () => {
+  const f = nativeFixture()
+  await f.auth.signIn('owner@example.test', 'synthetic-password')
+  const before = f.transactions.getItem(f.storage.sessionKey)
+  f.auth.clear(false, true)
+  assert.equal(f.transactions.getItem(f.storage.sessionKey), before)
+  assert.equal(await f.storage.getItem(prefix + 'LastAuthUser'), null)
+  await f.storage.setItem(`${prefix}${user.username}.refreshToken`, 'late-rotation')
+  f.storage.checkpoint(user.authTime)
+  assert.equal(f.transactions.getItem(f.storage.sessionKey), before)
+  const reloaded = nativeFixture({ persistent: f.persistent, transactions: f.transactions })
+  assert.equal((await reloaded.auth.restore()).accessToken, user.accessToken)
+  assert.equal(reloaded.state.fetches.length, 1)
+  assert.equal(reloaded.state.fetches[0].forceRefresh, false)
+  await f.auth.signOut()
+  assert.equal(f.transactions.getItem(f.storage.sessionKey), null)
+  reloaded.auth.clear()
+})
+
+test('startup transaction cleanup removes only known Cognito challenge keys and preserves the authenticated checkpoint', async () => {
+  const f = nativeFixture()
+  await f.auth.signIn('owner@example.test', 'synthetic-password')
+  const before = f.transactions.getItem(f.storage.sessionKey)
+  for (const key of ['username', 'challengeName', 'signInSession', 'expiry']) f.transactions.setItem(`CognitoSignInState.${key}`, 'stale')
+  f.transactions.setItem('CognitoSignInState.unrelated', 'keep')
+  f.transactions.setItem('other-tab-data', 'keep')
+  const reloaded = nativeFixture({ transactions: f.transactions })
+  for (const key of ['username', 'challengeName', 'signInSession', 'expiry']) assert.equal(f.transactions.getItem(`CognitoSignInState.${key}`), null)
+  assert.equal(f.transactions.getItem('CognitoSignInState.unrelated'), 'keep')
+  assert.equal(f.transactions.getItem('other-tab-data'), 'keep')
+  assert.equal(f.transactions.getItem(f.storage.sessionKey), before)
+  assert.ok(await reloaded.auth.restore())
+  f.auth.clear()
+  reloaded.auth.clear()
+})
+
+test('missing tab session never asks the SDK to restore global state', async () => {
+  const f = nativeFixture()
+  assert.equal(await f.auth.restore(), null)
+  assert.equal(f.state.fetches.length, 0)
+})
+
+test('SDK rotation checkpoints only settled results, and a late refresh after logout stays sealed', async () => {
+  for (const logout of [false, true]) {
+    const f = nativeFixture()
+    await f.auth.signIn('owner@example.test', 'synthetic-password')
+    const before = f.transactions.getItem(f.storage.sessionKey)
+    const pending = deferred(), started = deferred()
+    f.sdk.fetchAuthSession = async () => {
+      await f.storage.setItem(`${prefix}${user.username}.accessToken`, 'partial-access')
+      started.resolve()
+      await pending.promise
+      await f.storage.setItem(`${prefix}${user.username}.refreshToken`, 'rotated-refresh')
+      return { tokens: { accessToken: { payload: { token_use: 'access', username: user.username, device_key: user.deviceKey, auth_time: user.authTime }, toString: () => 'rotated-access' } } }
+    }
+    const refreshing = f.auth.refresh()
+    await started.promise
+    assert.equal(f.transactions.getItem(f.storage.sessionKey), before)
+    if (logout) {
+      await f.auth.signOut()
+      assert.equal(f.transactions.getItem(f.storage.sessionKey), null)
+      assert.equal(JSON.parse(f.state.requests[0].options.body).Token, 'synthetic-refresh')
+    }
+    pending.resolve()
+    if (logout) {
+      await assert.rejects(refreshing, error => error.code === 'cancelled' && error.terminal)
+      assert.equal(f.transactions.getItem(f.storage.sessionKey), null)
+      assert.equal(await f.storage.getItem(`${prefix}${user.username}.refreshToken`), null)
+    } else {
+      await refreshing
+      const record = JSON.parse(f.transactions.getItem(f.storage.sessionKey))
+      assert.equal(record.values[`${prefix}${user.username}.refreshToken`], 'rotated-refresh')
+      assert.equal(record.expiresAt, user.authTime + 8 * 3600)
+    }
+    f.auth.clear()
+  }
 })
 
 test('saved proof remains until revocation, is pool/client scoped, and migrates the deployed v1 record', async () => {
@@ -209,18 +386,21 @@ test('late rememberDevice success cannot promote device proof after cancellation
   assert.equal(f.persistent.length, 0)
 })
 
-test('cancel clears transactions immediately and again after late SDK challenge writes', async () => {
+test('terminal restart removes only SDK transactions, immediately and after late challenge writes', async () => {
   const f = nativeFixture()
+  f.transactions.setItem('unrelated-tab-data', 'keep')
   const pending = deferred(), started = deferred()
   f.sdk.signIn = async () => { started.resolve(); await pending.promise; f.transactions.setItem('CognitoSignInState.signInSession', 'late-transaction'); return { isSignedIn: false, nextStep: { signInStep: 'CONFIRM_SIGN_IN_WITH_TOTP_CODE' } } }
   const signingIn = f.auth.signIn('owner@example.test', 'synthetic-password')
   await started.promise
   f.transactions.setItem('CognitoSignInState.signInSession', 'transaction')
   f.auth.restart()
-  assert.equal(f.transactions.length, 0)
+  assert.equal(f.transactions.getItem('CognitoSignInState.signInSession'), null)
+  assert.equal(f.transactions.getItem('unrelated-tab-data'), 'keep')
   pending.resolve()
   await assert.rejects(signingIn, error => error.terminal)
-  assert.equal(f.transactions.length, 0)
+  assert.equal(f.transactions.getItem('CognitoSignInState.signInSession'), null)
+  assert.equal(f.transactions.getItem('unrelated-tab-data'), 'keep')
   assert.deepEqual(f.state.navigations, [config.origin + '/'])
 })
 
@@ -228,6 +408,7 @@ test('logout immediately seals memory, starts current refresh-family revocation 
   const f = nativeFixture()
   await f.auth.signIn('owner@example.test', 'synthetic-password')
   await f.auth.trust(user, session)
+  assert.ok(f.transactions.getItem(f.storage.sessionKey))
   await f.auth.signOut()
   assert.equal(await f.storage.getItem(`${prefix}${user.username}.accessToken`), null)
   assert.equal(JSON.parse(f.state.requests[0].options.body).Token, 'synthetic-refresh')
@@ -235,13 +416,14 @@ test('logout immediately seals memory, starts current refresh-family revocation 
   assert.equal(f.state.requests[0].url, 'https://cognito-idp.us-east-1.amazonaws.com')
   assert.equal(f.persistent.length, 1)
   assert.equal(f.transactions.length, 0)
+  assert.equal(f.transactions.getItem(f.storage.sessionKey), null)
   assert.deepEqual(f.state.navigations, ['https://www.frankmanu.com/'])
 })
 
 test('terminal storage failure cannot prevent local logout or public-homepage navigation', async () => {
   const f = nativeFixture()
   await f.auth.signIn('owner@example.test', 'synthetic-password')
-  f.transactions.clear = () => { throw new Error('Storage disabled') }
+  f.transactions.removeItem = () => { throw new Error('Storage disabled') }
   await f.auth.signOut()
   assert.equal(await f.storage.getItem(`${prefix}${user.username}.accessToken`), null)
   assert.deepEqual(f.state.navigations, ['https://www.frankmanu.com/'])
@@ -382,17 +564,17 @@ test('late owner data and rotating tokens cannot resurrect a cleared session', a
   }
 })
 
-test('late sign-in success cannot restore a cancelled session or call owner API', async t => {
+test('late sign-in success cannot restore a signed-out session or call owner API', async t => {
   const f = fixture(t), pending = deferred(), started = deferred()
   f.setSignIn(async () => { started.resolve(); return pending.promise })
   const signingIn = f.start(true)
   await started.promise
-  f.client.cancel()
+  await f.client.signOut()
   pending.resolve({ kind: 'done', user })
   await signingIn
   assert.equal(f.state.requests.length, 0)
   assert.equal(f.state.trusts, 0)
-  assert.equal(f.state.restarts, 1)
+  assert.equal(f.state.signOuts, 1)
 })
 
 test('device error codes clear local proof and private metadata; native Gateway errors fail closed', async t => {
@@ -463,12 +645,168 @@ test('device deletion without no-store or exact 204 cannot claim success', async
   }
 })
 
-test('reload opens an idle login form, never a persisted authenticated session or automatic redirect', t => {
+test('startup without a tab session stays on ordinary idle login and skips the owner API', async t => {
   const f = fixture(t)
+  await Promise.all([f.client.restore(), f.client.restore()])
   assert.equal(f.client.getSnapshot().status, 'login')
+  assert.equal(f.client.getSnapshot().authBusy, false)
   assert.equal(f.client.getSnapshot().flow.kind, 'credentials')
+  assert.equal(f.state.restores, 1)
   assert.equal(f.state.signIns, 0)
   assert.equal(f.state.requests.length, 0)
+})
+
+test('reload keeps the login card busy and opens no private UI until the backend reauthorizes the actual SDK user', async t => {
+  const f = fixture(t), sdkPending = deferred(), backendPending = deferred(), backendStarted = deferred()
+  f.setRestore(() => sdkPending.promise)
+  f.setTransport(async () => { backendStarted.resolve(); return backendPending.promise })
+  const restoring = f.client.restore()
+  assert.equal(f.client.getSnapshot().status, 'login')
+  assert.equal(f.client.getSnapshot().authBusy, true)
+  assert.equal(f.client.getSnapshot().session, null)
+  assert.equal(f.state.requests.length, 0)
+  sdkPending.resolve({ ...user, loginKind: 'refresh' })
+  await backendStarted.promise
+  assert.equal(f.client.getSnapshot().status, 'verifying')
+  assert.equal(f.client.getSnapshot().session, null)
+  assert.equal(f.client.getSnapshot().resume, null)
+  assert.equal(f.state.trusts, 0)
+  assert.equal(f.state.signIns, 0)
+  backendPending.resolve(response(session))
+  await restoring
+  assert.equal(f.client.getSnapshot().status, 'authenticated')
+  assert.equal(f.client.getSnapshot().session.owner.sub, user.sub)
+  assert.equal(f.client.getSnapshot().deviceTrusted, false)
+  assert.equal(f.state.requests.length, 1)
+  assert.equal(f.state.requests[0].url, config.apiUrl + '/v1/session')
+  assert.equal(f.state.requests[0].options.headers.Authorization, 'Bearer ' + user.accessToken)
+  await f.client.restore()
+  assert.equal(f.state.restores, 1)
+  assert.equal(f.state.requests.length, 1)
+})
+
+test('restoration validates actual scope, client, issuer, device, and authentication ceiling before owner requests', async t => {
+  for (const invalid of [
+    { ...user, scope: 'aws.cognito.signin.user.admin' },
+    { ...user, clientId: 'wrong-client' }, { ...user, issuer: 'https://wrong-pool.example.test' },
+    { ...user, deviceKey: '' }, { ...user, username: '' }, { ...user, authTime: 1061 },
+    { ...user, expiresAt: 1000 },
+  ]) {
+    const f = fixture(t)
+    f.setRestore(async () => invalid)
+    await f.client.restore()
+    assert.equal(f.client.getSnapshot().status, invalid.scope === 'aws.cognito.signin.user.admin' ? 'denied' : 'expired')
+    assert.equal(f.client.getSnapshot().session, null)
+    assert.equal(f.state.requests.length, 0)
+    assert.equal(f.state.trusts, 0)
+  }
+  const f = fixture(t)
+  f.state.now = user.authTime + 8 * 3600
+  f.setRestore(async () => ({ ...user, expiresAt: f.state.now + 300 }))
+  await f.client.restore()
+  assert.equal(f.client.getSnapshot().status, 'expired')
+  assert.equal(f.state.requests.length, 0)
+})
+
+test('restored sessions still obey owner/device revocation and owner-sub binding on the backend', async t => {
+  for (const [result, expectedStatus] of [
+    [response({ error: { code: 'DEVICE_REVOKED' } }, 403), 'expired'],
+    [response({ error: { code: 'OWNER_NOT_ACTIVE' } }, 403), 'denied'],
+    [response({ ...session, owner: { sub: 'not-the-owner' } }), 'unavailable'],
+    [response({ ...session, device: { ...device, key: 'wrong-device' } }), 'unavailable'],
+    [response({ ...session, authenticatedAt: user.authTime + 1 }), 'expired'],
+  ]) {
+    const f = fixture(t)
+    f.setRestore(async () => user)
+    f.setTransport(async () => result)
+    await f.client.restore()
+    assert.equal(f.client.getSnapshot().status, expectedStatus)
+    assert.equal(f.client.getSnapshot().session, null)
+    assert.equal(f.client.getSnapshot().resume, null)
+    assert.equal(f.state.trusts, 0)
+  }
+})
+
+test('an edited tab expiry cannot extend actual token auth_time and invalid SDK sessions discard the checkpoint', async t => {
+  for (const invalid of ['eight-hour', 'id-token', 'missing-device']) {
+    const original = nativeFixture()
+    await original.auth.signIn('owner@example.test', 'synthetic-password')
+    let now = 1000
+    if (invalid === 'eight-hour') {
+      now = user.authTime + 8 * 3600
+      const record = JSON.parse(original.transactions.getItem(original.storage.sessionKey))
+      record.authTime = now
+      record.expiresAt = now + 8 * 3600
+      original.transactions.setItem(original.storage.sessionKey, JSON.stringify(record))
+    }
+    original.auth.clear(false, true)
+    const reloaded = nativeFixture({ transactions: original.transactions, now: () => now })
+    if (invalid === 'eight-hour') reloaded.state.owner.expiresAt = now + 300
+    else reloaded.sdk.fetchAuthSession = async () => ({ tokens: { accessToken: { payload: { token_use: invalid === 'id-token' ? 'id' : 'access', username: user.username, auth_time: user.authTime }, toString: () => user.accessToken } } })
+    const client = new OwnerSessionClient(config, reloaded.auth, async () => { assert.fail('Invalid restored SDK state must not reach owner data') }, () => now)
+    t.after(() => client.clear('expired'))
+    await client.restore()
+    assert.equal(client.getSnapshot().status, 'expired')
+    assert.equal(client.getSnapshot().session, null)
+    assert.equal(original.transactions.getItem(original.storage.sessionKey), null)
+  }
+})
+
+test('late SDK restoration or owner confirmation cannot reopen a suspended or logged-out page', async t => {
+  for (const phase of ['sdk', 'backend']) {
+    for (const terminal of ['logout', 'pagehide']) {
+      const f = fixture(t), pending = deferred(), started = deferred()
+      if (phase === 'sdk') f.setRestore(async () => { started.resolve(); return pending.promise })
+      else {
+        f.setRestore(async () => user)
+        f.setTransport(async () => { started.resolve(); return pending.promise })
+      }
+      const restoring = f.client.restore()
+      await started.promise
+      if (terminal === 'logout') await f.client.signOut()
+      else f.client.suspend()
+      pending.resolve(phase === 'sdk' ? user : response(session))
+      await restoring
+      assert.equal(f.client.getSnapshot().status, terminal === 'logout' ? 'signing-out' : 'expired')
+      assert.equal(f.client.getSnapshot().session, null)
+      assert.equal(f.client.getSnapshot().resume, null)
+      assert.equal(f.state.preserveCheckpoint, terminal === 'pagehide')
+      assert.equal(f.state.requests.length, phase === 'sdk' ? 0 : 1)
+    }
+  }
+})
+
+test('pagehide seals private in-memory state while retaining a reload checkpoint; BFCache never reopens old metadata', async t => {
+  const f = fixture(t)
+  f.setRestore(async () => user)
+  await f.client.restore()
+  await f.client.loadResume()
+  f.client.suspend()
+  assert.equal(f.state.preserveCheckpoint, true)
+  assert.equal(f.client.getSnapshot().status, 'expired')
+  assert.equal(f.client.getSnapshot().session, null)
+  assert.equal(f.client.getSnapshot().resume, null)
+  const requests = f.state.requests.length
+  await f.client.checkSession()
+  await f.client.restore()
+  assert.equal(f.state.requests.length, requests)
+  assert.equal(f.state.restores, 1)
+  await f.client.signOut()
+  assert.equal(f.state.preserveCheckpoint, false)
+})
+
+test('backend unavailability during restoration hides data and retry reauthorizes before private UI', async t => {
+  const f = fixture(t)
+  f.setRestore(async () => user)
+  f.setTransport(async () => response({ error: { code: 'UNAVAILABLE' } }, 503))
+  await f.client.restore()
+  assert.equal(f.client.getSnapshot().status, 'unavailable')
+  assert.equal(f.client.getSnapshot().session, null)
+  assert.equal(f.client.getSnapshot().resume, null)
+  f.setTransport(async () => response(session))
+  await f.client.checkSession()
+  assert.equal(f.client.getSnapshot().status, 'authenticated')
+  assert.equal(f.state.signIns, 0)
 })
 
 test('backend unavailability hides private data and recovers only within the existing session', async t => {

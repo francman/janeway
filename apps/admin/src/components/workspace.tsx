@@ -118,6 +118,5 @@ function SessionScreen() {
       {(retry || denied) && <Button type="button" variant="secondary" className="min-h-11" onClick={() => { void client?.signOut() }}>Sign out</Button>}
       <Button href="https://www.frankmanu.com/" variant="secondary" className="min-h-11">Public website</Button>
     </div>}
-    <p className="mt-6 text-xs text-zinc-500 dark:text-zinc-400">Cognito verifies your password and authenticator. This dashboard keeps authenticated sessions in memory only. Sign-out always returns to the public homepage.</p>
   </section>
 }

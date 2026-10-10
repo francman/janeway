@@ -13,7 +13,8 @@
     "smoke:release": "node scripts/release-smoke.cjs",
     "dev:admin": "npm run dev --workspace @janeway/admin",
     "build:admin": "npm run build --workspace @janeway/admin",
-    "test:admin": "npm run test --workspace @janeway/admin"
+    "test:admin": "npm run test --workspace @janeway/admin",
+    "release:admin": "node scripts/release-admin.cjs"
   },
   "browserslist": "defaults, not ie <= 11",
   "dependencies": {
