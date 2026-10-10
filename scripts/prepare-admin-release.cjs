@@ -13,7 +13,7 @@ const revision = process.env.GITHUB_SHA || process.env.ADMIN_REVISION
 if (!/^[a-f0-9]{40}$/.test(revision || '')) throw new Error('Set ADMIN_REVISION to the reviewed full commit before packaging')
 const origin = process.env.NEXT_PUBLIC_ADMIN_ORIGIN
 if (origin !== 'https://frank.frankmanu.com') throw new Error('Production admin origin must be canonical')
-const connections = ['NEXT_PUBLIC_COGNITO_AUTHORITY', 'NEXT_PUBLIC_COGNITO_DOMAIN', 'NEXT_PUBLIC_ADMIN_API_URL'].map(name => {
+const connections = ['NEXT_PUBLIC_COGNITO_AUTHORITY', 'NEXT_PUBLIC_ADMIN_API_URL'].map(name => {
   const url = new URL(process.env[name] || '')
   if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) throw new Error(`Invalid ${name}`)
   return url.origin

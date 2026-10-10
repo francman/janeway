@@ -2,8 +2,8 @@
 
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { readAdminConfig } from '../lib/config'
-import { createAuthPort } from '../lib/oidc'
-import { OwnerSessionClient, type SessionSnapshot } from '../lib/session'
+import { createAuthPort } from '../lib/auth'
+import { OwnerSessionClient, initialSnapshot, type SessionSnapshot } from '../lib/session'
 
 interface SessionContextValue {
   client: OwnerSessionClient | null
@@ -11,7 +11,7 @@ interface SessionContextValue {
   configurationError: boolean
 }
 
-const initial: SessionSnapshot = { status: 'loading', session: null, resume: null, resumeStatus: 'idle' }
+const initial = initialSnapshot
 const SessionContext = createContext<SessionContextValue>({ client: null, snapshot: initial, configurationError: false })
 
 export function SessionProvider({ children }: { children: ReactNode }) {
@@ -26,14 +26,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const client = instance.current
       const update = () => setValue({ client, snapshot: client.getSnapshot(), configurationError: false })
       const unsubscribe = client.subscribe(update)
-      const mode = window.location.pathname === '/auth/callback/' ? 'callback' : window.location.pathname === '/signed-out/' ? 'signed-out' : 'workspace'
-      const callbackUrl = window.location.href
-      // Remove the authorization code/error from history before any API request.
-      if (mode === 'callback') window.history.replaceState(window.history.state, '', '/auth/callback/')
-      void client.start(mode, callbackUrl)
+      client.start()
       update()
       const onPageHide = () => {
-        if (client.getSnapshot().status !== 'redirecting') client.clear('expired')
+        client.clear('expired')
       }
       const onVisible = () => {
         if (document.visibilityState === 'visible') void client.checkSession()

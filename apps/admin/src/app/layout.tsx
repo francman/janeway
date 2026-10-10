@@ -4,8 +4,8 @@ import { SessionProvider } from '../components/session-provider'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: { default: 'Website admin — Frank Manu', template: '%s — Frank Manu admin' },
-  description: 'Private, read-only owner workspace.',
+  title: { default: 'Dashboard — Frank Manu', template: '%s — Frank Manu' },
+  description: 'Your personal workspace.',
   robots: { index: false, follow: false, nocache: true },
   referrer: 'no-referrer',
 }

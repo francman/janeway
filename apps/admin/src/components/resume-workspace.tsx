@@ -14,7 +14,6 @@ export function ResumeWorkspace() {
   const resume = snapshot.resume
 
   return <Workspace page="resume">
-    <div className="mb-6 text-xs text-zinc-500 dark:text-zinc-400"><strong className="font-medium text-zinc-700 dark:text-zinc-300">Owner workspace.</strong> Published metadata comes from the authenticated read-only API.</div>
     <header className="flex flex-wrap items-start justify-between gap-4">
       <div className="max-w-2xl"><h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Résumé</h1><p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">Review the current public PDF and its published revision.</p></div>
       <Button type="button" variant="secondary" className="min-h-11 disabled:cursor-wait disabled:opacity-60" disabled={snapshot.resumeStatus === 'loading'} onClick={() => { void client?.loadResume() }}>{snapshot.resumeStatus === 'loading' ? 'Refreshing…' : 'Refresh metadata'}</Button>
@@ -37,7 +36,7 @@ export function ResumeWorkspace() {
             <div><dt className="font-medium">Published at (UTC)</dt><dd className="mt-1 break-all font-mono text-xs text-zinc-600 dark:text-zinc-400"><time dateTime={resume.publishedAt}>{resume.publishedAt}</time></dd></div>
             <div><dt className="font-medium">Publication pointer ETag</dt><dd className="mt-1 break-all font-mono text-xs text-zinc-600 dark:text-zinc-400">{resume.etag}</dd></div>
           </dl>
-          <div className="mt-6 flex items-start gap-3 rounded-lg bg-teal-50 p-4 text-sm text-teal-900 dark:bg-teal-950/50 dark:text-teal-200"><Icon name="lock" className="mt-0.5 h-5 w-5 shrink-0" /><p>This workspace is read only. Uploads, replacement, and publication are not available here.</p></div>
+          <div className="mt-6 flex items-start gap-3 rounded-lg bg-teal-50 p-4 text-sm text-teal-900 dark:bg-teal-950/50 dark:text-teal-200"><Icon name="lock" className="mt-0.5 h-5 w-5 shrink-0" /><p>Uploads, replacement, and publication are not available here yet.</p></div>
         </section>
       </div>}
     </div>

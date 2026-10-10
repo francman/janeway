@@ -2,6 +2,7 @@ export interface OwnerSession {
   owner: { sub: string }
   authenticatedAt: number
   expiresAt: number
+  device: { key: string; createdAt: string; expiresAt: string }
 }
 
 export interface ResumeMetadata {
@@ -15,16 +16,17 @@ export interface ResumeMetadata {
   etag: string
 }
 
+export type DeviceErrorCode = 'DEVICE_NOT_FOUND' | 'DEVICE_EXPIRED' | 'DEVICE_REVOKED'
 export class ApiError extends Error {
-  constructor(readonly kind: 'expired' | 'denied' | 'unavailable', readonly requestId?: string) {
+  constructor(readonly kind: 'expired' | 'denied' | 'unavailable', readonly requestId?: string, readonly code?: DeviceErrorCode) {
     super(kind)
   }
 }
 
-// No caller-supplied URLs, methods, payloads, or owner identifiers.
+// The method and path are fixed by resource; no caller-selected device or owner.
 export async function ownerRequest(
   apiUrl: string,
-  resource: 'session' | 'resume',
+  resource: 'session' | 'resume' | 'device',
   accessToken: string,
   signal: AbortSignal,
   transport: typeof fetch = fetch,
@@ -32,7 +34,7 @@ export async function ownerRequest(
   let response: Response
   try {
     response = await transport(`${apiUrl}/v1/${resource}`, {
-      method: 'GET',
+      method: resource === 'device' ? 'DELETE' : 'GET',
       headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
       credentials: 'omit',
       cache: 'no-store',
@@ -43,28 +45,40 @@ export async function ownerRequest(
 
   if (!response.ok) {
     let requestId: string | undefined
+    let code: DeviceErrorCode | undefined
     try {
       const body = await response.json()
       if (typeof body?.error?.requestId === 'string' && /^[A-Za-z0-9_+=/-]{1,128}$/.test(body.error.requestId)) requestId = body.error.requestId
+      if (response.status === 403 && ['DEVICE_NOT_FOUND', 'DEVICE_EXPIRED', 'DEVICE_REVOKED'].includes(body?.error?.code)) code = body.error.code
     } catch { /* Only a bounded request ID, never raw backend messages, reaches UI. */ }
-    throw new ApiError(response.status === 401 ? 'expired' : response.status === 403 ? 'denied' : 'unavailable', requestId)
+    throw new ApiError(response.status === 401 ? 'expired' : response.status === 403 ? 'denied' : 'unavailable', requestId, code)
   }
   if (!response.headers.get('cache-control')?.split(',').some(value => value.trim().toLowerCase() === 'no-store')) {
     throw new ApiError('unavailable')
+  }
+  if (resource === 'device') {
+    if (response.status !== 204) throw new ApiError('unavailable')
+    return { value: null, etag: null }
   }
   try {
     return { value: await response.json(), etag: response.headers.get('etag') }
   } catch { throw new ApiError('unavailable') }
 }
 
-export function parseSession(value: unknown, sub: string, now: number): OwnerSession {
+export function parseSession(value: unknown, sub: string, now: number, deviceKey: string): OwnerSession {
   const session = value as OwnerSession | null
+  const createdAt = typeof session?.device?.createdAt === 'string' ? Date.parse(session.device.createdAt) : NaN
+  const expiresAt = typeof session?.device?.expiresAt === 'string' ? Date.parse(session.device.expiresAt) : NaN
   if (
     !session || session.owner?.sub !== sub ||
     !Number.isSafeInteger(session.authenticatedAt) || session.authenticatedAt <= 0 || session.authenticatedAt > now + 60 ||
-    !Number.isSafeInteger(session.expiresAt) || session.expiresAt <= now
+    !Number.isSafeInteger(session.expiresAt) || session.expiresAt <= now ||
+    session.device?.key !== deviceKey || !Number.isFinite(createdAt) || !Number.isFinite(expiresAt) ||
+    createdAt <= 0 || createdAt > (now + 60) * 1000 || expiresAt <= now * 1000 ||
+    expiresAt - createdAt !== 30 * 24 * 60 * 60 * 1000 ||
+    new Date(createdAt).toISOString() !== session.device.createdAt || new Date(expiresAt).toISOString() !== session.device.expiresAt
   ) throw new ApiError('unavailable')
-  return { owner: { sub }, authenticatedAt: session.authenticatedAt, expiresAt: session.expiresAt }
+  return { owner: { sub }, authenticatedAt: session.authenticatedAt, expiresAt: session.expiresAt, device: { key: deviceKey, createdAt: session.device.createdAt, expiresAt: session.device.expiresAt } }
 }
 
 export function parseResume(value: unknown, etag: string | null): ResumeMetadata {
