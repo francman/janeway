@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'reac
 import { Button } from '@janeway/ui/button'
 import { MAX_PDF_BYTES, UploadFailure, uploadPdfToStaging, type PreviewGrant, type ValidationReceipt } from '../lib/resume-upload'
 import type { OwnerSessionClient } from '../lib/session'
+import { ResumePublication } from './resume-publication'
 
 type Phase = 'idle' | 'selected' | 'authorizing' | 'uploading' | 'validating' | 'ready' | 'error'
 const working = new Set<Phase>(['authorizing', 'uploading', 'validating'])
@@ -27,6 +28,7 @@ export function ResumeUploader({ client }: { client: OwnerSessionClient }) {
   const [validatedPreview, setValidatedPreview] = useState<PreviewGrant | null>(null)
   const [receipt, setReceipt] = useState<ValidationReceipt | null>(null)
   const [failure, setFailure] = useState<{ message: string; requestId?: string } | null>(null)
+  const [publicationActive, setPublicationActive] = useState(false)
   const controller = useRef<AbortController | null>(null)
   const generation = useRef(0)
   const localPreview = useRef<string | null>(null)
@@ -44,6 +46,7 @@ export function ResumeUploader({ client }: { client: OwnerSessionClient }) {
     controller.current = null
   }, [])
   function select(event: ChangeEvent<HTMLInputElement>) {
+    if (publicationActive) return
     invalidate()
     clearPreview()
     setReceipt(null)
@@ -71,7 +74,7 @@ export function ResumeUploader({ client }: { client: OwnerSessionClient }) {
   }
   async function upload() {
     const session = client.getSnapshot()
-    if (!file || working.has(phase) || session.status !== 'authenticated' || !session.session) return
+    if (!file || publicationActive || working.has(phase) || session.status !== 'authenticated' || !session.session) return
     invalidate()
     const current = generation.current
     const request = new AbortController()
@@ -104,7 +107,7 @@ export function ResumeUploader({ client }: { client: OwnerSessionClient }) {
     finally { if (controller.current === request) controller.current = null }
   }
   async function refreshPreview() {
-    if (!receipt || working.has(phase)) return
+    if (!receipt || publicationActive || working.has(phase)) return
     if (Date.parse(receipt.expiresAt) <= Date.now()) { expireGrants(); return }
     invalidate()
     const current = generation.current
@@ -186,15 +189,16 @@ export function ResumeUploader({ client }: { client: OwnerSessionClient }) {
     </div>
     <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.4fr)]">
       <div className="min-w-0 space-y-5">
-        <div><label htmlFor="resume-file" className="text-sm font-medium">PDF file</label><input ref={input} id="resume-file" type="file" accept="application/pdf,.pdf" disabled={working.has(phase)} onChange={select} className="mt-2 block w-full rounded-lg border border-zinc-200 bg-white p-3 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-zinc-100 file:px-3 file:py-2 file:font-medium dark:border-zinc-700 dark:bg-zinc-900 dark:file:bg-zinc-800" /><p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">PDF only · 10 MiB maximum · private staging expires after 7 days.</p></div>
+        <div><label htmlFor="resume-file" className="text-sm font-medium">PDF file</label><input ref={input} id="resume-file" type="file" accept="application/pdf,.pdf" disabled={publicationActive || working.has(phase)} onChange={select} className="mt-2 block w-full rounded-lg border border-zinc-200 bg-white p-3 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-zinc-100 file:px-3 file:py-2 file:font-medium dark:border-zinc-700 dark:bg-zinc-900 dark:file:bg-zinc-800" /><p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">PDF only · 10 MiB maximum · private staging expires after 7 days.</p></div>
         {file && <dl className="space-y-2 text-sm"><div className="flex justify-between gap-3"><dt className="text-zinc-500 dark:text-zinc-400">Selected</dt><dd className="min-w-0 truncate">{file.name}</dd></div><div className="flex justify-between gap-3"><dt className="text-zinc-500 dark:text-zinc-400">Size</dt><dd>{file.size.toLocaleString()} bytes</dd></div></dl>}
         {phase === 'uploading' && <progress className="h-2 w-full accent-teal-700" value={progress} max={100}>{progress}%</progress>}
         {phaseLabel && <p role="status" className="text-sm text-zinc-600 dark:text-zinc-300">{phaseLabel}</p>}
         {failure && <div role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"><p>{failure.message}</p>{failure.requestId && <p className="mt-2 break-all text-xs">Request ID: {failure.requestId}</p>}</div>}
         {activeReceipt && phase === 'ready' && <div className="rounded-lg bg-teal-50 p-4 text-sm text-teal-950 dark:bg-teal-950/60 dark:text-teal-100"><p className="font-medium">Validated and ready for review—not published.</p><dl className="mt-3 space-y-2 text-xs"><div><dt className="font-medium">SHA-256</dt><dd className="mt-1 break-all font-mono">{activeReceipt.sha256}</dd></div><div className="flex justify-between gap-3"><dt>Pages</dt><dd>{activeReceipt.pageCount}</dd></div><div className="flex justify-between gap-3"><dt>Validation expires</dt><dd><time dateTime={activeReceipt.expiresAt}>{new Date(activeReceipt.expiresAt).toLocaleString()}</time></dd></div></dl></div>}
-        <div className="flex flex-wrap gap-3"><Button type="button" disabled={!file || working.has(phase)} onClick={() => { void upload() }}>{phase === 'ready' ? 'Validate again' : phase === 'error' ? 'Try upload again' : 'Upload and validate'}</Button>{working.has(phase) && <Button type="button" variant="secondary" onClick={cancel}>Cancel</Button>}{activeReceipt && <Button type="button" variant="secondary" disabled={working.has(phase)} onClick={() => { void refreshPreview() }}>Refresh validated preview</Button>}</div>
+        <div className="flex flex-wrap gap-3"><Button type="button" disabled={!file || publicationActive || working.has(phase)} onClick={() => { void upload() }}>{phase === 'ready' ? 'Validate again' : phase === 'error' ? 'Try upload again' : 'Upload and validate'}</Button>{working.has(phase) && <Button type="button" variant="secondary" onClick={cancel}>Cancel</Button>}{activeReceipt && <Button type="button" variant="secondary" disabled={publicationActive || working.has(phase)} onClick={() => { void refreshPreview() }}>Refresh validated preview</Button>}</div>
       </div>
       <div className="min-w-0"><div className="overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-950">{previewUrl ? <iframe title={activeReceipt ? 'Validated résumé preview' : 'Selected local résumé preview'} src={previewUrl} referrerPolicy="no-referrer" className="h-[34rem] w-full bg-white" /> : <div className="flex h-72 items-center justify-center p-6 text-center text-sm text-zinc-500 dark:text-zinc-400">{activeReceipt ? 'Private preview access expired. Refresh the validated preview to review this version.' : 'Select a PDF to preview it locally before upload.'}</div>}</div><p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">{activeReceipt && activePreview ? `This preview is the exact validated S3 version. Preview access expires ${new Date(activePreview.expiresAt).toLocaleTimeString()}.` : previewUrl ? 'Local browser preview only; the server has not validated this file.' : 'No private file is loaded.'}</p></div>
     </div>
+    <ResumePublication client={client} receipt={activeReceipt} filename={file?.name ?? ''} previewAvailable={!!activePreview} previewExpiresAt={activePreview?.expiresAt ?? null} onActiveChange={setPublicationActive} />
   </section>
 }

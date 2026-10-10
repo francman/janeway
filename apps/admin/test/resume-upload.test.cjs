@@ -262,6 +262,7 @@ function uploaderFixture(t, operations = {}) {
       if (specifier === 'react/jsx-runtime') return { jsx, jsxs: jsx }
       if (specifier === '@janeway/ui/button') return { Button: 'button' }
       if (specifier === '../lib/resume-upload') return privateClient
+      if (specifier === './resume-publication') return { ResumePublication: 'publication-panel' }
       throw new Error('Unexpected component dependency: ' + specifier)
     },
   })

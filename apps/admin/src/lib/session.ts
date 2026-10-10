@@ -7,6 +7,7 @@ import {
   validateResumeUpload as requestResumeValidation,
   type PreviewGrant, type UploadAuthorization, type ValidationReceipt,
 } from './resume-upload'
+import { getResumePublication as requestResumePublication, publishResume as requestResumePublicationCommit, type PublicationOutcome } from './resume-publication'
 
 export type SessionStatus = 'login' | 'verifying' | 'authenticated' | 'signing-out' | 'expired' | 'denied' | 'unavailable' | 'error'
 export interface SessionSnapshot {
@@ -47,6 +48,7 @@ export class OwnerSessionClient {
 
   readonly loginId: string
   readonly stagingOrigin: string
+  readonly publicationScope: string
   constructor(
     private readonly config: AdminConfig,
     private readonly auth: AuthPort,
@@ -55,6 +57,7 @@ export class OwnerSessionClient {
   ) {
     this.loginId = config.loginId
     this.stagingOrigin = config.previewOrigin
+    this.publicationScope = `${config.authority}|${config.clientId}|${config.apiUrl}`
   }
 
   getSnapshot = (): SessionSnapshot => this.snapshot
@@ -240,6 +243,7 @@ export class OwnerSessionClient {
     try {
       const value = await operation(token, controller.signal, ownerSub)
       if (generation !== this.generation || !this.user || this.now() >= Math.min(this.deadline, this.user.expiresAt)) throw new ApiError('expired')
+      if (controller.signal.aborted) throw new ApiError('unavailable')
       return value
     } catch (error) {
       if (generation === this.generation && error instanceof ApiError && error.kind !== 'unavailable') this.reject(error)
@@ -258,6 +262,12 @@ export class OwnerSessionClient {
   }
   getResumePreview(receipt: ValidationReceipt, callerSignal?: AbortSignal): Promise<PreviewGrant> {
     return this.uploadOperation((token, signal, ownerSub) => requestResumePreview(this.config.apiUrl, this.config.previewOrigin, ownerSub, token, receipt, signal, this.transport), callerSignal)
+  }
+  publishResume(validationId: string, expectedEtag: string, operationId: string, callerSignal?: AbortSignal): Promise<PublicationOutcome> {
+    return this.uploadOperation((token, signal) => requestResumePublicationCommit(this.config.apiUrl, token, validationId, expectedEtag, operationId, signal, this.transport), callerSignal)
+  }
+  getResumePublication(operationId: string, callerSignal?: AbortSignal): Promise<PublicationOutcome> {
+    return this.uploadOperation((token, signal) => requestResumePublication(this.config.apiUrl, token, operationId, signal, this.transport), callerSignal)
   }
 
   checkSession = (): Promise<void> => {

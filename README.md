@@ -206,8 +206,8 @@ short pages and follow the content on longer pages, without overlaying controls.
 Résumé metadata comes from the authenticated
 API; the public PDF action uses `/resume.pdf` on the public website. Writings and
 Metrics explicitly report that their capabilities are not available/connected.
-The résumé uploader stages and validates a private PDF without publishing it;
-there are no editor, publication or fabricated analytics controls.
+The résumé uploader stages and validates a private PDF; a separate explicit
+review/approval transaction publishes it. Editors and analytics remain deferred.
 Their implementation remains in the separate children of
 [dashboard epic #11](https://github.com/francman/janeway/issues/11).
 
@@ -222,7 +222,7 @@ The dashboard does not import the portfolio shell or public PostHog provider.
 The résumé workspace supports selecting an unencrypted PDF up to 10 MiB,
 local browser preview, direct private S3 upload with progress, pinned-version
 server validation and private preview of the exact validated version.
-No step changes the public résumé or displays a Published result.
+Upload and validation alone never change the public résumé or claim publication.
 
 The server grants an exact owner/key/content-type/byte-count POST capability
 for five minutes. The browser must receive `x-amz-version-id` and send that
@@ -245,6 +245,42 @@ to make a preview work. Native PDF viewing depends on browser support/settings.
 The operator and version/recovery contracts are in janeway-infra's runbook;
 [infra #8](https://github.com/francman/janeway-infra/issues/8) records rollout proof.
 
+### Reviewed résumé publication
+
+After validation, **Review publication** reads current metadata and freezes its
+pointer ETag alongside the selected PDF's receipt, hash and size. An available
+exact-version preview and a separate unchecked approval box are required before
+**Publish résumé** can send `{validationId,confirm:true}` with the original
+`If-Match` and a fresh UUID `Idempotency-Key`.
+
+Publishing changes the S3 current pointer, not application code. The stable
+public `/resume.pdf` link opens the current inline PDF in a protected new tab;
+it requires no Git commit, Amplify build or CDN invalidation. Older approved
+revision URLs remain valid.
+
+- A stale review conflicts rather than silently rebasing or overwriting.
+- A lost response is **unknown**, not automatically failed or successful.
+  **Check outcome** sends GET only; it never resubmits publication.
+- Only the latest scoped operation UUID persists in per-owner per-tab
+  `sessionStorage` for reload recovery. PDFs, receipts, signed URLs, review
+  metadata and confirmation remain memory-only. Authentication is still required
+  to read the operation; the UUID is not a bearer capability.
+- Recovery remains available after the validation/preview expires. Read and
+  explicitly acknowledge the displayed outcome before dismissing it or starting
+  a fresh review. A newly uncertain result requires fresh acknowledgement.
+- `committed` proves this operation committed; matching current metadata proves
+  it is still current. `superseded` is a historical commit, not the current PDF.
+- Explicit approval can make a complete validated immutable revision public
+  before pointer commit. A subsequent conflict/failure preserves the current
+  link but does not make that approved revision private again.
+
+Server transaction, least-privilege permissions, 30-day operation retention,
+recovery and metered Lambda/S3/log costs are in janeway-infra's **Reviewed résumé
+publication and recovery** runbook. [infra #9](https://github.com/francman/janeway-infra/issues/9)
+records the isolated real-S3/browser proof and rollout. Implementation deployment
+does not itself approve or replace the existing production résumé.
+
+
 ### Authentication and privacy
 
 - Cognito `janewayUsers` / `janewayDashboard` still verifies credentials and
@@ -255,8 +291,9 @@ The operator and version/recovery contracts are in janeway-infra's runbook;
 - By owner approval, access/ID/rotating-refresh tokens and the SDK session
   checkpoint persist in per-tab `sessionStorage` so refresh can restore sign-in.
   This storage is JavaScript-accessible: XSS can expose bearer tokens; it is not
-  an HttpOnly session. No bearer tokens go in `localStorage`. Private API data,
-  uploads and preview capabilities remain memory-only.
+  an HttpOnly session. No bearer tokens go in `localStorage`. PDFs, private
+  response bodies and preview capabilities remain memory-only; publication
+  recovery persists only its non-bearer operation UUID as described above.
   The SDK's short-lived sign-in challenge transaction also uses per-tab
   `sessionStorage`; account passwords, one-time codes and QR seeds are not
   persisted. Completion and logout clear challenge state.

@@ -32,6 +32,8 @@ async function main() {
     ['POST', '/v1/resume/uploads'],
     ['POST', '/v1/resume/uploads/13cfb5e9-7e06-4b92-8524-f0c6ba5f0ad1/validate'],
     ['GET', '/v1/resume/validations/54c69aa4-ae81-4a91-a5d0-e16b4765e20c/preview'],
+    ['POST', '/v1/resume/publications'],
+    ['GET', '/v1/resume/publications/54c69aa4-ae81-4a91-a5d0-e16b4765e20c'],
   ]) {
     for (const authorization of [undefined, 'Bearer invalid']) {
       const response = await fetch(api + route, { method, headers: authorization ? { Authorization: authorization } : {}, redirect: 'manual' })
@@ -54,11 +56,19 @@ async function main() {
     await response.arrayBuffer()
   }
   for (const requestOrigin of [origin, 'https://untrusted.invalid']) {
-    const response = await fetch(api + '/v1/resume', { method: 'OPTIONS', headers: { Origin: requestOrigin, 'Access-Control-Request-Method': 'GET', 'Access-Control-Request-Headers': 'authorization' } })
-    const allowed = response.headers.get('access-control-allow-origin')
-    if (requestOrigin === origin) assert.equal(allowed, origin)
-    else assert.equal(allowed, null)
-    await response.arrayBuffer()
+    for (const [method, route, headers] of [
+      ['GET', '/v1/resume', 'authorization'],
+      ['POST', '/v1/resume/publications', 'authorization,content-type,if-match,if-none-match,idempotency-key'],
+    ]) {
+      const response = await fetch(api + route, { method: 'OPTIONS', headers: { Origin: requestOrigin, 'Access-Control-Request-Method': method, 'Access-Control-Request-Headers': headers } })
+      const allowed = response.headers.get('access-control-allow-origin')
+      if (requestOrigin === origin) {
+        assert.equal(allowed, origin)
+        const allowedHeaders = new Set((response.headers.get('access-control-allow-headers') || '').toLowerCase().split(',').map(value => value.trim()))
+        for (const header of headers.split(',')) assert.ok(allowedHeaders.has(header), `Preflight must permit ${header}`)
+      } else assert.equal(allowed, null)
+      await response.arrayBuffer()
+    }
   }
   console.log('Live static routes, hydration CSP, anonymous API denial and exact-origin CORS passed. Owner/MFA/session browser acceptance is separate.')
 }
