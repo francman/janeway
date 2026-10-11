@@ -21,7 +21,8 @@ function safeLink(value) {
   try { return ['https:', 'mailto:'].includes(new URL(value).protocol) } catch { return false }
 }
 function imageName(value) {
-  return typeof value === 'string' ? value.replace(/^\.\//, '').replace(/^\//, '') : ''
+  if (typeof value !== 'string') return ''
+  try { return decodeURIComponent(value.replace(/^\.\//, '').replace(/^\//, '')) } catch { return '' }
 }
 // Shared private-writing AST policy. Publication supplies a Set of owned
 // names; only preview opts into resolving names to short private image grants.
@@ -29,6 +30,13 @@ export function safeDraftPolicy(assets, { resolveImages = false } = {}) {
   return function policy() {
     return (tree, file) => {
       const fail = (message, node) => file.fail(message, node.position)
+      const definitions = new Map()
+      const identifier = value => String(value ?? '').trim().replace(/\s+/g, ' ').toLowerCase()
+      function collectDefinitions(node) {
+        if (node.type === 'definition' && !definitions.has(identifier(node.identifier))) definitions.set(identifier(node.identifier), node.url)
+        for (const child of node.children ?? []) collectDefinitions(child)
+      }
+      collectDefinitions(tree)
       function visit(node) {
         if (node.type === 'mdxjsEsm' || node.type === 'mdxFlowExpression' || node.type === 'mdxTextExpression' || node.type === 'html') fail('Executable MDX and raw HTML are not supported in private preview.', node)
         if (node.type === 'mdxJsxFlowElement' || node.type === 'mdxJsxTextElement') {
@@ -46,6 +54,7 @@ export function safeDraftPolicy(assets, { resolveImages = false } = {}) {
         }
         if ((node.type === 'link' || node.type === 'definition') && !safeLink(node.url) && !assets.has(imageName(node.url))) fail('This link is not supported in private preview.', node)
         if (node.type === 'image' && !assets.has(imageName(node.url))) fail('Images must reference validated assets owned by this draft.', node)
+        if (node.type === 'imageReference' && !assets.has(imageName(definitions.get(identifier(node.identifier))))) fail('Images must reference validated assets owned by this draft.', node)
         if (resolveImages && (node.type === 'image' || (node.type === 'definition' && assets.has(imageName(node.url))))) node.url = assets.get(imageName(node.url))
         for (const child of node.children ?? []) visit(child)
       }
