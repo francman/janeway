@@ -408,10 +408,11 @@ the production API's exact CORS boundary prevents it from opening private data.
 Do not enter production credentials there. A functioning development identity/API
 environment requires separate reviewed resources and configuration.
 
-The six public build settings are `NEXT_PUBLIC_ADMIN_ORIGIN`,
+The seven public build settings are `NEXT_PUBLIC_ADMIN_ORIGIN`,
 `NEXT_PUBLIC_COGNITO_AUTHORITY`, `NEXT_PUBLIC_COGNITO_CLIENT_ID`,
-`NEXT_PUBLIC_COGNITO_LOGIN_ID`, `NEXT_PUBLIC_ADMIN_API_URL` and
-`NEXT_PUBLIC_RESUME_PREVIEW_ORIGIN` (the exact private regional staging origin).
+`NEXT_PUBLIC_COGNITO_LOGIN_ID`, `NEXT_PUBLIC_ADMIN_API_URL`,
+`NEXT_PUBLIC_RESUME_PREVIEW_ORIGIN` and `NEXT_PUBLIC_WRITING_PREVIEW_ORIGIN`
+(the exact private regional staging and durable-writing origins).
 The fixed login ID is the owner's public email alias; the form asks only for the
 password. Pool/client/API values come from `JanewayAdminStack`; never embed the
 immutable owner subject or tokens. Native authentication connects to the regional
@@ -439,8 +440,9 @@ Do not add `unsafe-inline`/`unsafe-eval` to script policy to fix a broken build.
 uploads without logging its signed URL, and observes the Amplify job. If an
 operation fails or its outcome is unknown, inspect the reported job (or the
 app's production jobs when no ID is available) before retrying.
-`scripts/smoke-admin-public.cjs` verifies real route delivery, hydration hashes,
-anonymous/invalid-token denial on reads and device deletion, exact-origin CORS,
+`scripts/smoke-admin-public.cjs` verifies real route delivery including the editor,
+hydration hashes, anonymous/invalid-token denial on résumé/writing/metrics/device
+routes, and exact-origin CORS including conditional draft PUT requests,
 and removal of callback/signed-out routes. Real MFA, remembered/untrusted devices,
 recovery/forgetting, public-homepage logout, desktop/mobile interactions and the
 public-site smoke are additional acceptance gates, not implied by an uploaded zip.
