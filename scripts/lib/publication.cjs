@@ -64,19 +64,23 @@ async function readCurrentItem({ ddb, table, slug }) {
   return response.Item
 }
 
-async function commitRevision({ ddb, table, item, expectedKey }) {
+function publicationCommitInput({ table, item, expectedKey }) {
   const slug = item?.slug?.S
   if (!isRevisionKey(slug, item?.s3Key?.S)) throw new Error('Commit requires an immutable revision pointer')
   if (expectedKey !== null && !isRevisionKey(slug, expectedKey)) {
     throw new Error('Legacy or invalid current pointer: run the reviewed migration before publishing')
   }
-  await ddb.send(new PutItemCommand({
+  return {
     TableName: table,
     Item: item,
     ConditionExpression: expectedKey === null ? 'attribute_not_exists(#slug)' : '#key = :expected',
     ExpressionAttributeNames: expectedKey === null ? { '#slug': 'slug' } : { '#key': 's3Key' },
     ...(expectedKey === null ? {} : { ExpressionAttributeValues: { ':expected': { S: expectedKey } } }),
-  }))
+  }
 }
 
-module.exports = { stageRevision, revisionObjectInput, readCurrentItem, commitRevision }
+async function commitRevision({ ddb, table, item, expectedKey }) {
+  await ddb.send(new PutItemCommand(publicationCommitInput({ table, item, expectedKey })))
+}
+
+module.exports = { stageRevision, revisionObjectInput, readCurrentItem, publicationCommitInput, commitRevision }
