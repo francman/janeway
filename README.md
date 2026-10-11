@@ -217,8 +217,10 @@ Public deploy job **52** and its read-only content/security/mobile smoke passed.
 Isolated real-store/browser proof covers private save/preview, exact reviewed
 publication and retained-unsaved-text export on expiry; production-owner acceptance
 remains separate. No production article or résumé was published during verification.
-Live PostHog data is not connected: sample previews are not production metrics.
-Remaining owner/reference acceptance is tracked in
+Live PostHog data is connected to website project **109737** through the US Query
+API and a server-only project-restricted `query:read` credential. Backend correction
+`f82f858` matches all sections to independent PostHog references; no frontend
+rebuild was needed. Final owner definition/visual acceptance remains tracked in
 [dashboard epic #11](https://github.com/francman/janeway/issues/11).
 Visible duplicate page headings/hero introductions are omitted; accessible
 hidden H1s and functional section/action/error labels remain.
@@ -263,7 +265,8 @@ configuration shows **Disconnected**, not zero counts. The local loopback
 mockup at `http://127.0.0.1:3190/metrics/` is explicitly labelled fictional and
 does not authenticate or query PostHog.
 
-Proposed definitions are public-host `$pageview` totals, whole-window distinct
+Current defaults, pending final owner review, are public-host `$pageview` totals,
+whole-window distinct
 browser IDs (not verified people or summed daily uniques), UTC daily trend,
 top10 paths/referrer hosts, default30/max90 days, end exclusive. Date controls
 refresh explicitly; prior successful results are labelled stale/actual-window
@@ -271,12 +274,19 @@ on failure. Definitions/privacy details are accessible and collapsed. No
 bounce/duration/conversion/person/replay claims, tracking changes, private
 dashboard capture, query strings or browser IDs in aggregate responses.
 
-Real connection requires project ID, verified US/EU/self-hosted query API origin
-and project-scoped Query Read personal key. Store config server-side String
-`/janeway/admin/posthog-config` and key SecureString
-`/janeway/admin/posthog-read-key`, never chat/GitHub/NEXT_PUBLIC/browser/logs.
-The existing public ingestion key is not query authority. Real reference-query
-agreement and owner definition approval remain separate acceptance gates.
+The verified query origin is `https://us.posthog.com`, not the ingestion endpoint
+`https://us.i.posthog.com`. Configuration remains server-side String
+`/janeway/admin/posthog-config` and the project-only **janewayMetricsRead** key
+remains SecureString `/janeway/admin/posthog-read-key`, never
+chat/GitHub/NEXT_PUBLIC/browser/logs. The public ingestion key is not query authority.
+For 2026-09-11 → 2026-10-11 UTC, deployed totals were 245 pageviews and 82 distinct
+browser IDs; daily browser IDs sum to 91 and must not substitute for the period
+count. Daily trend, top10 paths and seven referrer hosts matched the reference.
+Real 7/90-day presets, a no-events day and desktop/390px light/dark views passed.
+Direct/unknown referrals include empty parsed hostnames; safe dotted/wildcard
+public paths remain visible. Captured pageviews are not guaranteed total traffic:
+blocking, retention and ingestion delay can affect coverage, and bot/internal
+exclusion is not claimed. Owner approval of these definitions remains in app #19.
 
 
 ### Private résumé upload and preview
