@@ -210,9 +210,16 @@ The footer has no status slogan: its separator and name sit at the bottom of
 short pages and follow the content on longer pages, without overlaying controls.
 Résumé metadata and publication come from the owner API; public viewing uses
 `/resume.pdf`. Private writing drafts/editor/reviewed publishing and the Metrics
-adapter are implemented in source, with cloud rollout and owner/reference
-acceptance tracked separately in [dashboard epic #11](https://github.com/francman/janeway/issues/11).
-Do not infer deployed or live analytics from implementation or sample previews.
+adapter are deployed: admin Amplify job **11** succeeded on 2026-10-11, revision
+`1ec065bfc37310db78e62db3597bcd110c730241`, artifact SHA-256
+`971c35a1ea370c3f38d671cd109363af4294117c06d0f7ba95198f9e69cafb8d`.
+Public deploy job **52** and its read-only content/security/mobile smoke passed.
+Isolated real-store/browser proof covers private save/preview, exact reviewed
+publication and retained-unsaved-text export on expiry; production-owner acceptance
+remains separate. No production article or résumé was published during verification.
+Live PostHog data is not connected: sample previews are not production metrics.
+Remaining owner/reference acceptance is tracked in
+[dashboard epic #11](https://github.com/francman/janeway/issues/11).
 Visible duplicate page headings/hero introductions are omitted; accessible
 hidden H1s and functional section/action/error labels remain.
 
