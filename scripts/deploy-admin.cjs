@@ -50,6 +50,7 @@ async function releaseContext(profile) {
   assert.equal(app.platform, 'WEB')
   assert.ok(!app.repository, 'Admin app must remain Git-disconnected')
   assert.equal(outputs.ResumeStagingBucketName, `janeway-resume-staging-${account}-${region}`)
+  assert.equal(outputs.WritingDraftsBucketName, `janeway-writing-drafts-${account}-${region}`)
   const loginId = process.env.NEXT_PUBLIC_COGNITO_LOGIN_ID || 'frankmanu500@gmail.com'
   assert.ok(loginId === loginId.trim().toLowerCase() && loginId.length <= 128 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginId), 'Invalid public owner email alias')
   const env = {
@@ -61,6 +62,7 @@ async function releaseContext(profile) {
     NEXT_PUBLIC_COGNITO_LOGIN_ID: loginId,
     NEXT_PUBLIC_ADMIN_API_URL: outputs.AdminApiUrl.replace(/\/$/, ''),
     NEXT_PUBLIC_RESUME_PREVIEW_ORIGIN: `https://${outputs.ResumeStagingBucketName}.s3.${region}.amazonaws.com`,
+    NEXT_PUBLIC_WRITING_PREVIEW_ORIGIN: `https://${outputs.WritingDraftsBucketName}.s3.${region}.amazonaws.com`,
     ADMIN_API_URL: outputs.AdminApiUrl.replace(/\/$/, ''),
   }
   return { revision, appId, env }

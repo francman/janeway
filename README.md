@@ -208,19 +208,69 @@ the sidebar and top-bar separators share a 72px header band. Presentation omits
 the Website Admin, Read Only and Owner Access labels without changing permissions.
 The footer has no status slogan: its separator and name sit at the bottom of
 short pages and follow the content on longer pages, without overlaying controls.
-Résumé metadata comes from the authenticated
-API; the public PDF action uses `/resume.pdf` on the public website. Writings and
-Metrics explicitly report that their capabilities are not available/connected.
-The résumé uploader stages and validates a private PDF; a separate explicit
-review/approval transaction publishes it. Editors and analytics remain deferred.
-Their implementation remains in the separate children of
-[dashboard epic #11](https://github.com/francman/janeway/issues/11).
+Résumé metadata and publication come from the owner API; public viewing uses
+`/resume.pdf`. Private writing drafts/editor/reviewed publishing and the Metrics
+adapter are implemented in source, with cloud rollout and owner/reference
+acceptance tracked separately in [dashboard epic #11](https://github.com/francman/janeway/issues/11).
+Do not infer deployed or live analytics from implementation or sample previews.
+Visible duplicate page headings/hero introductions are omitted; accessible
+hidden H1s and functional section/action/error labels remain.
 
 The public app remains in `src/app`, with its existing `amplify.yml`, `deploy`
 branch and SSR permissions. `packages/ui` is a private workspace containing the
 shared Button, Container and font-size tokens; consumers import its direct
 subpaths. Public TypeScript/Tailwind discovery excludes admin artifacts.
 The dashboard does not import the portfolio shell or public PostHog provider.
+
+### Private writing drafts and reviewed articles
+
+The Writings library explicitly creates a new private draft or forks a selected
+published writing. It never imports repository/live articles automatically.
+`/writings/edit/?draft=<UUID>` is a fixed static-export route with owner-private
+strong reads, canonical MDX source, surgical inline frontmatter controls, private
+PNG/JPEG/WebP attachments and saved-revision sandboxed preview. Incomplete
+drafts remain saveable. Existing article slugs/bases stay locked.
+
+**Save private draft** freezes its input, saved revision and operation UUID.
+Concurrent saves conflict, lost responses require read-only outcome checks,
+and **Saved** means durable server acknowledgement, not browser memory.
+The root editor retains unsaved text on expiry with explicit copy/export before
+reauthentication and protects dirty internal/history/refresh navigation.
+Only scoped draft/operation UUIDs persist; MDX, tokens and signed image grants
+are not placed in localStorage. Multiline/complex YAML remains source-only;
+untouched source, comments and mixed line endings must not be reserialized.
+
+**Review and publish** compares the clean saved snapshot and actual preview to
+the captured live base, then requires unchecked explicit approval. It never
+auto-saves, rewrites body/date/status, adds an addendum, renames a published URL
+or rebases an old approval. Server staging uses immutable revisions and one
+public/private/result transaction with the shared CLI expected-key predicate.
+Cache refresh failure is `committed, refreshPending`; retry only refresh.
+Approved complete revisions may be addressable before a conflicting commit;
+retain old/orphan URLs. No production article is published just to test code.
+
+### Website Metrics and local sample review
+
+Production Metrics never imports its sample fixture. A missing PostHog read
+configuration shows **Disconnected**, not zero counts. The local loopback
+mockup at `http://127.0.0.1:3190/metrics/` is explicitly labelled fictional and
+does not authenticate or query PostHog.
+
+Proposed definitions are public-host `$pageview` totals, whole-window distinct
+browser IDs (not verified people or summed daily uniques), UTC daily trend,
+top10 paths/referrer hosts, default30/max90 days, end exclusive. Date controls
+refresh explicitly; prior successful results are labelled stale/actual-window
+on failure. Definitions/privacy details are accessible and collapsed. No
+bounce/duration/conversion/person/replay claims, tracking changes, private
+dashboard capture, query strings or browser IDs in aggregate responses.
+
+Real connection requires project ID, verified US/EU/self-hosted query API origin
+and project-scoped Query Read personal key. Store config server-side String
+`/janeway/admin/posthog-config` and key SecureString
+`/janeway/admin/posthog-read-key`, never chat/GitHub/NEXT_PUBLIC/browser/logs.
+The existing public ingestion key is not query authority. Real reference-query
+agreement and owner definition approval remain separate acceptance gates.
+
 
 ### Private résumé upload and preview
 

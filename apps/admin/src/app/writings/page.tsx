@@ -1,4 +1,4 @@
-import { UnavailableWorkspace } from '../../components/unavailable-workspace'
+import { WritingsWorkspace } from '../../components/writings-workspace'
 
 export const metadata = { title: 'Writings' }
-export default function WritingsPage() { return <UnavailableWorkspace page="writings" /> }
+export default function WritingsPage() { return <WritingsWorkspace /> }

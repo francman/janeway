@@ -15,8 +15,8 @@ export function ResumeWorkspace() {
   const resume = snapshot.resume
 
   return <Workspace page="resume">
-    <header className="flex flex-wrap items-start justify-between gap-4">
-      <div className="max-w-2xl"><h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Résumé</h1><p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">Review the current public PDF and its published revision.</p></div>
+    <header className="flex justify-end">
+      <h1 className="sr-only">Résumé</h1>
       <Button type="button" variant="secondary" className="min-h-11 disabled:cursor-wait disabled:opacity-60" disabled={snapshot.resumeStatus === 'loading'} onClick={() => { void client?.loadResume() }}>{snapshot.resumeStatus === 'loading' ? 'Refreshing…' : 'Refresh metadata'}</Button>
     </header>
     <div className="mt-6 border-t border-zinc-200 pt-5 dark:border-zinc-800">

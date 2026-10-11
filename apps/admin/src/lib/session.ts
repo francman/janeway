@@ -8,6 +8,10 @@ import {
   type PreviewGrant, type UploadAuthorization, type ValidationReceipt,
 } from './resume-upload'
 import { getResumePublication as requestResumePublication, publishResume as requestResumePublicationCommit, type PublicationOutcome } from './resume-publication'
+import * as writingRequests from './writing-drafts'
+import { getMetrics, MetricsFailure } from './metrics'
+import type { MetricsRange, MetricsSnapshot } from './metrics-definitions'
+import * as writingPublication from './writing-publication'
 
 export type SessionStatus = 'login' | 'verifying' | 'authenticated' | 'signing-out' | 'expired' | 'denied' | 'unavailable' | 'error'
 export interface SessionSnapshot {
@@ -15,6 +19,7 @@ export interface SessionSnapshot {
   session: OwnerSession | null
   resume: ResumeMetadata | null
   resumeStatus: 'idle' | 'loading' | 'ready' | 'unavailable'
+  metrics: MetricsSnapshot
   flow: Exclude<AuthStep, { kind: 'done' }>
   authBusy: boolean
   authError?: AuthErrorCode
@@ -30,6 +35,7 @@ const REFRESH_LEAD_SECONDS = 60
 export const initialSnapshot: SessionSnapshot = {
   status: 'login', session: null, resume: null, resumeStatus: 'idle', flow: { kind: 'credentials' },
   authBusy: false, deviceTrusted: false, deviceStatus: 'idle',
+  metrics: { status: 'idle', data: null },
 }
 
 export class OwnerSessionClient {
@@ -43,6 +49,8 @@ export class OwnerSessionClient {
   private checking: Promise<void> | null = null
   private loadingResume: Promise<void> | null = null
   private restoration: Promise<void> | null = null
+  private metricsGeneration = 0
+  private metricsRequest: AbortController | null = null
   private trustRequested = false
   private readonly requests = new Set<AbortController>()
 
@@ -268,6 +276,74 @@ export class OwnerSessionClient {
   }
   getResumePublication(operationId: string, callerSignal?: AbortSignal): Promise<PublicationOutcome> {
     return this.uploadOperation((token, signal) => requestResumePublication(this.config.apiUrl, token, operationId, signal, this.transport), callerSignal)
+  }
+  listWritingDrafts(cursor?: string, callerSignal?: AbortSignal): Promise<writingRequests.DraftPage> {
+    return this.uploadOperation((token, signal) => writingRequests.listWritingDrafts(this.config.apiUrl, token, cursor, signal, this.transport), callerSignal)
+  }
+  getWritingDraft(draftId: string, callerSignal?: AbortSignal): Promise<writingRequests.WritingDraft> {
+    return this.uploadOperation((token, signal, ownerSub) => writingRequests.getWritingDraft(this.config.apiUrl, token, ownerSub, draftId, signal, this.transport), callerSignal)
+  }
+  createWritingDraft(input: writingRequests.CreateDraftInput, operationId: string, callerSignal?: AbortSignal): Promise<writingRequests.DraftOperation> {
+    return this.uploadOperation((token, signal) => writingRequests.createWritingDraft(this.config.apiUrl, token, input, operationId, signal, this.transport), callerSignal)
+  }
+  saveWritingDraft(draftId: string, input: writingRequests.DraftInput, revision: string, operationId: string, callerSignal?: AbortSignal): Promise<writingRequests.DraftOperation> {
+    return this.uploadOperation((token, signal) => writingRequests.saveWritingDraft(this.config.apiUrl, token, draftId, input, revision, operationId, signal, this.transport), callerSignal)
+  }
+  getWritingOperation(operationId: string, callerSignal?: AbortSignal): Promise<writingRequests.DraftOperation> {
+    return this.uploadOperation((token, signal) => writingRequests.getWritingOperation(this.config.apiUrl, token, operationId, signal, this.transport), callerSignal)
+  }
+  listPublishedWritings(cursor?: string, callerSignal?: AbortSignal): Promise<writingRequests.PublishedPage> {
+    return this.uploadOperation((token, signal) => writingRequests.listPublishedWritings(this.config.apiUrl, token, cursor, signal, this.transport), callerSignal)
+  }
+  getPublishedWriting(slug: string, callerSignal?: AbortSignal): Promise<writingRequests.PublishedWriting> {
+    return this.uploadOperation((token, signal) => writingRequests.getPublishedWriting(this.config.apiUrl, token, slug, signal, this.transport), callerSignal)
+  }
+  authorizeWritingAsset(draftId: string, file: File, callerSignal?: AbortSignal): Promise<writingRequests.AssetAuthorization> {
+    return this.uploadOperation((token, signal, ownerSub) => writingRequests.authorizeWritingAsset(this.config.apiUrl, token, ownerSub, draftId, file, signal, this.transport), callerSignal)
+  }
+  validateWritingAsset(draftId: string, assetId: string, versionId: string, callerSignal?: AbortSignal): Promise<writingRequests.WritingAsset> {
+    return this.uploadOperation((token, signal, ownerSub) => writingRequests.validateWritingAsset(this.config.apiUrl, token, ownerSub, draftId, assetId, versionId, signal, this.transport), callerSignal)
+  }
+  getWritingAssetPreview(draftId: string, asset: writingRequests.WritingAsset, callerSignal?: AbortSignal): Promise<writingRequests.AssetPreview> {
+    return this.uploadOperation((token, signal, ownerSub) => writingRequests.getWritingAssetPreview(this.config.apiUrl, token, ownerSub, draftId, asset, signal, this.transport), callerSignal)
+  }
+  previewWritingDraft(draftId: string, revision: string, callerSignal?: AbortSignal): Promise<writingRequests.DraftPreview> {
+    return this.uploadOperation((token, signal) => writingRequests.previewWritingDraft(this.config.apiUrl, token, draftId, revision, signal, this.transport), callerSignal)
+  }
+  async loadMetrics(range: MetricsRange, callerSignal?: AbortSignal): Promise<void> {
+    const generation = this.generation
+    const metricsGeneration = ++this.metricsGeneration
+    this.metricsRequest?.abort()
+    const request = new AbortController()
+    this.metricsRequest = request
+    const cancel = () => request.abort()
+    callerSignal?.addEventListener('abort', cancel, { once: true })
+    if (callerSignal?.aborted) request.abort()
+    const previous = this.snapshot.metrics.data
+    this.publish({ metrics: { status: 'loading', data: previous } })
+    try {
+      const data = await this.uploadOperation((token, signal) => getMetrics(this.config.apiUrl, token, range, signal, this.transport), request.signal)
+      if (generation === this.generation && metricsGeneration === this.metricsGeneration && !request.signal.aborted) this.publish({ metrics: { status: 'ready', data } })
+    } catch (error) {
+      if (generation !== this.generation || metricsGeneration !== this.metricsGeneration || request.signal.aborted) return
+      const failure = error instanceof MetricsFailure ? error : null
+      this.publish({ metrics: failure?.code === 'DISCONNECTED' ? { status: 'disconnected', data: null } : {
+        status: failure?.code === 'RATE_LIMITED' ? 'rate-limited' : 'error', data: previous,
+        error: failure?.code === 'INVALID_RANGE' ? 'Choose a valid UTC window of at most 90 days.' : 'Metrics could not be refreshed.', retryAt: failure?.retryAt,
+      } })
+    } finally {
+      callerSignal?.removeEventListener('abort', cancel)
+      if (this.metricsRequest === request) this.metricsRequest = null
+    }
+  }
+  publishWriting(draftId: string, revision: string, expectedPublishedKey: string | null, operationId: string, callerSignal?: AbortSignal): Promise<writingPublication.WritingPublicationOutcome> {
+    return this.uploadOperation((token, signal) => writingPublication.publishWriting(this.config.apiUrl, token, draftId, revision, expectedPublishedKey, operationId, signal, this.transport), callerSignal)
+  }
+  getWritingPublication(operationId: string, callerSignal?: AbortSignal): Promise<writingPublication.WritingPublicationOutcome> {
+    return this.uploadOperation((token, signal) => writingPublication.getWritingPublication(this.config.apiUrl, token, operationId, signal, this.transport), callerSignal)
+  }
+  refreshWritingPublication(operationId: string, callerSignal?: AbortSignal): Promise<writingPublication.WritingPublicationOutcome> {
+    return this.uploadOperation((token, signal) => writingPublication.refreshWritingPublication(this.config.apiUrl, token, operationId, signal, this.transport), callerSignal)
   }
 
   checkSession = (): Promise<void> => {

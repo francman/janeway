@@ -13,7 +13,7 @@ const revision = process.env.GITHUB_SHA || process.env.ADMIN_REVISION
 if (!/^[a-f0-9]{40}$/.test(revision || '')) throw new Error('Set ADMIN_REVISION to the reviewed full commit before packaging')
 const origin = process.env.NEXT_PUBLIC_ADMIN_ORIGIN
 if (origin !== 'https://frank.frankmanu.com') throw new Error('Production admin origin must be canonical')
-const connectionNames = ['NEXT_PUBLIC_COGNITO_AUTHORITY', 'NEXT_PUBLIC_ADMIN_API_URL', 'NEXT_PUBLIC_RESUME_PREVIEW_ORIGIN']
+const connectionNames = ['NEXT_PUBLIC_COGNITO_AUTHORITY', 'NEXT_PUBLIC_ADMIN_API_URL', 'NEXT_PUBLIC_RESUME_PREVIEW_ORIGIN', 'NEXT_PUBLIC_WRITING_PREVIEW_ORIGIN']
 const connectionUrls = Object.fromEntries(connectionNames.map(name => {
   const url = new URL(process.env[name] || '')
   const validPath = name === 'NEXT_PUBLIC_COGNITO_AUTHORITY' ? /^\/us-east-1_[A-Za-z0-9]+$/.test(url.pathname) : url.pathname === '/'
@@ -45,11 +45,11 @@ const csp = [
   `script-src 'self' ${[...hashes].sort().join(' ')}`,
   "script-src-attr 'none'",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data:",
+  `img-src 'self' data: ${connectionUrls.NEXT_PUBLIC_WRITING_PREVIEW_ORIGIN}`,
   "font-src 'self'",
   `connect-src 'self' ${[...new Set(connections)].join(' ')}`,
   "object-src 'none'",
-  `frame-src 'self' blob: ${connectionUrls.NEXT_PUBLIC_RESUME_PREVIEW_ORIGIN}`,
+  `frame-src 'self' blob: ${connectionUrls.NEXT_PUBLIC_RESUME_PREVIEW_ORIGIN} ${connectionUrls.NEXT_PUBLIC_WRITING_PREVIEW_ORIGIN}`,
   "frame-ancestors 'none'",
   "base-uri 'none'",
   "form-action 'self'",

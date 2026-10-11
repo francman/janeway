@@ -6,7 +6,7 @@ const origin = 'https://frank.frankmanu.com'
 const api = process.env.ADMIN_API_URL
 async function main() {
   assert.match(api || '', /^https:\/\/[a-z0-9]+\.execute-api\.us-east-1\.amazonaws\.com$/)
-  for (const route of ['/', '/writings/', '/metrics/']) {
+  for (const route of ['/', '/writings/', '/writings/edit/', '/metrics/']) {
     const response = await fetch(origin + route, { redirect: 'manual' })
     assert.equal(response.status, 200, `${route} must serve a real static route`)
     assert.match(response.headers.get('content-type') || '', /text\/html/)
@@ -34,6 +34,19 @@ async function main() {
     ['GET', '/v1/resume/validations/54c69aa4-ae81-4a91-a5d0-e16b4765e20c/preview'],
     ['POST', '/v1/resume/publications'],
     ['GET', '/v1/resume/publications/54c69aa4-ae81-4a91-a5d0-e16b4765e20c'],
+    ['GET', '/v1/writings/drafts'], ['POST', '/v1/writings/drafts'],
+    ['GET', '/v1/writings/drafts/54c69aa4-ae81-4a91-a5d0-e16b4765e20c'],
+    ['PUT', '/v1/writings/drafts/54c69aa4-ae81-4a91-a5d0-e16b4765e20c'],
+    ['GET', '/v1/writings/operations/54c69aa4-ae81-4a91-a5d0-e16b4765e20c'],
+    ['GET', '/v1/writings/published'], ['GET', '/v1/writings/published/authorization-smoke'],
+    ['POST', '/v1/writings/drafts/54c69aa4-ae81-4a91-a5d0-e16b4765e20c/assets/uploads'],
+    ['POST', '/v1/writings/drafts/54c69aa4-ae81-4a91-a5d0-e16b4765e20c/assets/13cfb5e9-7e06-4b92-8524-f0c6ba5f0ad1/validate'],
+    ['GET', '/v1/writings/drafts/54c69aa4-ae81-4a91-a5d0-e16b4765e20c/assets/13cfb5e9-7e06-4b92-8524-f0c6ba5f0ad1/preview'],
+    ['POST', '/v1/writings/drafts/54c69aa4-ae81-4a91-a5d0-e16b4765e20c/preview'],
+    ['POST', '/v1/writings/drafts/54c69aa4-ae81-4a91-a5d0-e16b4765e20c/publications'],
+    ['GET', '/v1/writings/publications/54c69aa4-ae81-4a91-a5d0-e16b4765e20c'],
+    ['POST', '/v1/writings/publications/54c69aa4-ae81-4a91-a5d0-e16b4765e20c/refresh'],
+    ['GET', '/v1/metrics'],
   ]) {
     for (const authorization of [undefined, 'Bearer invalid']) {
       const response = await fetch(api + route, { method, headers: authorization ? { Authorization: authorization } : {}, redirect: 'manual' })
@@ -59,6 +72,8 @@ async function main() {
     for (const [method, route, headers] of [
       ['GET', '/v1/resume', 'authorization'],
       ['POST', '/v1/resume/publications', 'authorization,content-type,if-match,if-none-match,idempotency-key'],
+      ['PUT', '/v1/writings/drafts/54c69aa4-ae81-4a91-a5d0-e16b4765e20c', 'authorization,content-type,if-match,idempotency-key'],
+      ['GET', '/v1/metrics', 'authorization'],
     ]) {
       const response = await fetch(api + route, { method: 'OPTIONS', headers: { Origin: requestOrigin, 'Access-Control-Request-Method': method, 'Access-Control-Request-Headers': headers } })
       const allowed = response.headers.get('access-control-allow-origin')

@@ -1,4 +1,4 @@
-import { UnavailableWorkspace } from '../../components/unavailable-workspace'
+import { MetricsWorkspace } from '../../components/metrics-workspace'
 
 export const metadata = { title: 'Metrics' }
-export default function MetricsPage() { return <UnavailableWorkspace page="metrics" /> }
+export default function MetricsPage() { return <MetricsWorkspace /> }

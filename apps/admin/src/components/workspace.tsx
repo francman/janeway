@@ -8,6 +8,7 @@ import { Icon } from './icon'
 import { ThemeToggle } from './theme-toggle'
 import { useOwnerSession } from './session-provider'
 import { LoginPanel, AuthErrorMessage } from './login-panel'
+import { WritingEditorRecovery } from './writing-editor-provider'
 import type { SessionStatus } from '../lib/session'
 import avatarImage from '../../../../src/images/avatar.jpg'
 
@@ -75,6 +76,7 @@ export function Workspace({ page, children }: { page: WorkspacePage; children: R
       </header>}
       <main id="main" tabIndex={-1} className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col p-4 outline-none sm:p-6 xl:p-8">
         <div className="flex-1">
+          <WritingEditorRecovery />
         {configurationError ? <section className="panel mx-auto mt-8 max-w-xl" role="alert"><Icon name="lock" className="h-8 w-8 text-teal-700 dark:text-teal-400" /><h1 className="mt-5 text-2xl font-semibold tracking-tight">Dashboard setup unavailable</h1><p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">The sign-in configuration could not be loaded securely. Use the configured dashboard address and allow session storage for the temporary sign-in transaction. If this persists, the deployment operator needs to check the public Cognito and API configuration.</p><a href="https://www.frankmanu.com/" className="mt-6 inline-block text-sm font-medium underline underline-offset-4">Return to the public website</a></section> : authenticated ? <>
           {snapshot.notice === 'trust-failed' && <p role="alert" className="panel mb-5 text-sm"><AuthErrorMessage code="trust-failed" /></p>}
           {snapshot.deviceStatus === 'error' && <div role="alert" className="panel mb-5 text-sm"><p>The server did not confirm that this browser was forgotten. Saved proof has not been removed. Retry, or sign out without claiming device revocation.</p>{snapshot.requestId && <p className="mt-2 break-all text-xs">Request ID: {snapshot.requestId}</p>}<Button type="button" className="mt-3" onClick={() => { void client?.forgetDevice() }}>Retry forgetting this browser</Button></div>}

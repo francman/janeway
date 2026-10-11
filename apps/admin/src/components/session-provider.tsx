@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { readAdminConfig } from '../lib/config'
 import { createAuthPort } from '../lib/auth'
 import { OwnerSessionClient, initialSnapshot, type SessionSnapshot } from '../lib/session'
+import { WritingEditorProvider } from './writing-editor-provider'
 
 interface SessionContextValue {
   client: OwnerSessionClient | null
@@ -51,7 +52,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
+  return <SessionContext.Provider value={value}><WritingEditorProvider>{children}</WritingEditorProvider></SessionContext.Provider>
 }
 
 export function useOwnerSession() { return useContext(SessionContext) }
