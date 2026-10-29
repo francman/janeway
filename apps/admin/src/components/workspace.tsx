@@ -21,12 +21,12 @@ const pages = {
 
 const states: Record<Exclude<SessionStatus, 'authenticated' | 'login' | 'verifying' | 'signing-out'>, { title: string; description: string; busy?: boolean }> = {
   expired: { title: 'Your session has ended', description: 'Private data has been cleared. Sign in again to continue. Sessions remain bounded to eight hours.' },
-  denied: { title: 'Access has not been granted', description: 'Your account is not authorized for this dashboard. If you just completed enrollment, activation may still be pending.' },
+  denied: { title: 'Access was denied', description: 'The dashboard could not authorize this request. Sign in again to continue.' },
   unavailable: { title: 'Your session could not be checked', description: 'The dashboard is temporarily unavailable. No private data is shown. Retry the check or sign out.' },
   error: { title: 'Sign-in could not be completed', description: 'Your workspace is not open. Start a new sign-in in this tab when you are ready.' },
 }
 
-export function Workspace({ page, children }: { page: WorkspacePage; children: ReactNode }) {
+export function Workspace({ page, children, topbarNavigation }: { page: WorkspacePage; children: ReactNode; topbarNavigation?: ReactNode }) {
   const { snapshot, client, configurationError } = useOwnerSession()
   const drawer = useRef<HTMLDialogElement>(null)
   const menuButton = useRef<HTMLButtonElement>(null)
@@ -39,13 +39,12 @@ export function Workspace({ page, children }: { page: WorkspacePage; children: R
     media.addEventListener('change', onChange)
     return () => media.removeEventListener('change', onChange)
   }, [])
-
   useEffect(() => { if (!authenticated) drawer.current?.close() }, [authenticated])
 
-  const navigation = (mobile: boolean) => <>
+  const navigation = <>
     <div className="flex-1 px-3 py-6">
       <p className="mb-3 px-3 text-xs font-medium uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Workspace</p>
-      <nav aria-label={mobile ? 'Mobile dashboard' : 'Dashboard'} className="space-y-1">
+      <nav aria-label="Dashboard" className="space-y-1">
         {Object.entries(pages).map(([key, item]) => <Link key={key} href={item.href} className="nav-button" aria-current={key === page ? 'page' : undefined} onClick={() => drawer.current?.close()}><Icon name={item.icon} className="h-5 w-5 shrink-0" />{item.title}</Link>)}
       </nav>
     </div>
@@ -62,15 +61,13 @@ export function Workspace({ page, children }: { page: WorkspacePage; children: R
         <Image src={avatarImage} alt="" width={40} height={40} className="h-10 w-10 shrink-0 rounded-full object-cover" />
         <p className="text-sm font-semibold">Frank Manu</p>
       </div>
-      {navigation(false)}
+      {navigation}
     </aside>}
     <div className={authenticated ? 'flex min-h-screen flex-col lg:pl-[248px]' : 'flex min-h-screen flex-col'}>
       {authenticated && <header className="admin-topbar">
-        <div className="flex min-w-0 items-center gap-3">
+        <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
           <button ref={menuButton} type="button" className="icon-button lg:hidden" aria-label="Open navigation" aria-expanded={menuOpen} aria-controls="mobile-navigation" onClick={() => { drawer.current?.showModal(); setMenuOpen(true) }}><Icon name="menu" className="h-5 w-5" /></button>
-          <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 text-sm">
-            <span className="whitespace-nowrap text-zinc-500 dark:text-zinc-400">Workspace</span><span aria-hidden="true" className="text-zinc-400">/</span><span className="truncate font-medium">{pages[page].title}</span>
-          </nav>
+          {topbarNavigation ?? <span className="truncate text-sm font-medium">{pages[page].title}</span>}
         </div>
         <ThemeToggle />
       </header>}
@@ -98,7 +95,7 @@ export function Workspace({ page, children }: { page: WorkspacePage; children: R
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
     }}>
       <div className="flex h-[72px] shrink-0 items-center justify-between border-b border-zinc-200 px-4 dark:border-zinc-800"><div className="flex items-center gap-3"><Image src={avatarImage} alt="" width={40} height={40} className="h-10 w-10 shrink-0 rounded-full object-cover" /><p id="mobile-menu-title" className="font-semibold">Frank Manu</p></div><button type="button" className="icon-button" aria-label="Close navigation" onClick={() => drawer.current?.close()}><Icon name="close" className="h-5 w-5" /></button></div>
-      {navigation(true)}
+      {navigation}
     </dialog>}
   </>
 }

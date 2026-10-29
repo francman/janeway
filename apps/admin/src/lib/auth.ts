@@ -13,9 +13,7 @@ export interface AuthUser {
   expiresAt: number
   issuer: string
   clientId: string
-  scope: string
   deviceKey: string
-  loginKind: string
 }
 export type AuthStep =
   | { kind: 'credentials' }
@@ -126,8 +124,7 @@ export class NativeAuth implements AuthPort {
     const user = {
       accessToken: token.toString(), sub: String(claims.sub ?? ''), username: claims.username,
       authTime: Number(claims.auth_time), expiresAt: Number(claims.exp), issuer: String(claims.iss ?? ''),
-      clientId: String(claims.client_id ?? ''), scope: String(claims.scope ?? ''),
-      deviceKey: claims.device_key, loginKind: String(claims.janeway_login_kind ?? ''),
+      clientId: String(claims.client_id ?? ''), deviceKey: claims.device_key,
     }
     this.storage.checkpoint(user.authTime)
     return user
@@ -175,7 +172,6 @@ export class NativeAuth implements AuthPort {
   trust(user: AuthUser, session: OwnerSession): Promise<boolean> {
     return this.run(async () => {
       if (this.isTrusted(user)) return true
-      if (!['fresh', 'new-password'].includes(user.loginKind)) throw new AuthFailure('trust-failed')
       try {
         await this.api.rememberDevice()
         if (this.closed) throw new AuthFailure('cancelled', true)

@@ -49,7 +49,7 @@ const csp = [
   "font-src 'self'",
   `connect-src 'self' ${[...new Set(connections)].join(' ')}`,
   "object-src 'none'",
-  `frame-src 'self' blob: ${connectionUrls.NEXT_PUBLIC_RESUME_PREVIEW_ORIGIN} ${connectionUrls.NEXT_PUBLIC_WRITING_PREVIEW_ORIGIN}`,
+  `frame-src 'self' blob: ${connectionUrls.NEXT_PUBLIC_RESUME_PREVIEW_ORIGIN} ${connectionUrls.NEXT_PUBLIC_WRITING_PREVIEW_ORIGIN} https://www.frankmanu.com https://d343w34l5jqzb2.cloudfront.net`,
   "frame-ancestors 'none'",
   "base-uri 'none'",
   "form-action 'self'",

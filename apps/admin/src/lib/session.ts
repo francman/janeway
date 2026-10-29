@@ -180,12 +180,10 @@ export class OwnerSessionClient {
   }
 
   private validateUser(user: AuthUser): void {
-    if (!user.scope.split(' ').includes('janeway-admin/access')) throw new ApiError('denied')
     if (
       !user.accessToken ||
       !Number.isSafeInteger(user.expiresAt) || user.expiresAt <= this.now() ||
       !user.sub || !user.username || !user.deviceKey || user.issuer !== this.config.authority || user.clientId !== this.config.clientId ||
-      !['fresh', 'new-password', 'device', 'refresh'].includes(user.loginKind) ||
       !Number.isSafeInteger(user.authTime) || user.authTime <= 0 || user.authTime > this.now() + 60 ||
       user.authTime + MAX_SESSION_SECONDS <= this.now()
     ) throw new ApiError('expired')

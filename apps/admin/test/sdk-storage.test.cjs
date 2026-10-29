@@ -34,8 +34,8 @@ const username = 'canonical-owner'
 const jwt = claims => `${Buffer.from(JSON.stringify({ alg: 'RS256' })).toString('base64url')}.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.synthetic-signature`
 const claims = (authTime, expiresAt) => ({
   sub: 'owner-sub', username, token_use: 'access', exp: expiresAt, iat: expiresAt - 300, auth_time: authTime,
-  iss: config.authority, client_id: config.clientId, scope: 'janeway-admin/access aws.cognito.signin.user.admin',
-  device_key: 'us-east-1_device', janeway_login_kind: 'refresh',
+  iss: config.authority, client_id: config.clientId, scope: 'aws.cognito.signin.user.admin',
+  device_key: 'us-east-1_device',
 })
 class Storage {
   values = new Map()

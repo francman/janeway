@@ -1,103 +1,6 @@
 const assert = require('node:assert/strict')
-const fs = require('node:fs')
-const path = require('node:path')
-const vm = require('node:vm')
 const test = require('node:test')
-const ts = require('typescript')
-const { createRequire } = require('node:module')
-const { File } = require('node:buffer')
-
-const NOW = Date.parse('2026-10-10T12:00:00.000Z')
-const OWNER = 'owner-sub'
-const DRAFT = '13cfb5e9-7e06-4b92-8524-f0c6ba5f0ad1'
-const REVISION = '23cfb5e9-7e06-4b92-8524-f0c6ba5f0ad1'
-const NEXT_REVISION = '33cfb5e9-7e06-4b92-8524-f0c6ba5f0ad1'
-const OP = '43cfb5e9-7e06-4b92-8524-f0c6ba5f0ad1'
-const ORIGIN = 'https://janeway-writing-drafts-486207805298-us-east-1.s3.us-east-1.amazonaws.com'
-const draft = () => ({ schemaVersion: 1, draftId: DRAFT, label: 'Private writing', targetSlug: 'fixture-writing', revision: REVISION, createdAt: new Date(NOW - 1000).toISOString(), updatedAt: new Date(NOW).toISOString(), basePublished: null, sourceMdx: 'Original saved MDX', assets: [] })
-const metadata = (revision = NEXT_REVISION) => { const { schemaVersion, sourceMdx, assets, ...item } = draft(); return { ...item, revision } }
-const text = node => node == null || typeof node === 'boolean' ? '' : typeof node === 'string' || typeof node === 'number' ? String(node) : Array.isArray(node) ? node.map(text).join(' ') : text(node.props?.children)
-function nodes(tree, predicate) {
-  const result = []
-  const walk = node => {
-    if (Array.isArray(node)) { for (const child of node) walk(child); return }
-    if (!node || typeof node !== 'object') return
-    if (predicate(node)) result.push(node)
-    walk(node.props?.children)
-  }
-  walk(tree)
-  return result
-}
-function harness(t, globals = {}) {
-  const clock = { now: NOW }, timers = new Map(), modules = new Map(), scopes = new Map(), events = new Map(), documentEvents = new Map(), copies = [], downloads = [], pushes = [], stored = new Map()
-  let active, timerId = 0, uuid = 0, confirmation = false, confirmCount = 0
-  let session = { client: null, snapshot: { status: 'authenticated', session: { owner: { sub: OWNER } } } }
-  let editorHook = null
-  const timer = (fn, milliseconds) => { const id = ++timerId; timers.set(id, { fn, due: clock.now + milliseconds }); return id }
-  const react = {
-    createContext(value) { const context = { current: value }; context.Provider = { context }; return context },
-    useContext(context) { return context.current },
-    useRef(value) { const index = active.cursor++; active.slots[index] ??= { kind: 'ref', current: value }; return active.slots[index] },
-    useState(initial) { const scope = active, index = scope.cursor++; scope.slots[index] ??= { kind: 'state', value: typeof initial === 'function' ? initial() : initial }; return [scope.slots[index].value, value => { const next = typeof value === 'function' ? value(scope.slots[index].value) : value; if (!Object.is(next, scope.slots[index].value)) { scope.slots[index].value = next; scope.dirty = true } }] },
-    useEffect(callback, deps) { const index = active.cursor++, previous = active.slots[index]; if (!previous || !deps || deps.some((value, position) => !Object.is(value, previous.deps?.[position]))) { active.slots[index] = { kind: 'effect', deps, cleanup: previous?.cleanup }; active.effects.push({ index, callback }) } },
-    useSyncExternalStore(subscribe, getSnapshot) { active.cursor++; return getSnapshot() },
-  }
-  const jsx = (type, props) => { if (type?.context) type.context.current = props.value; return { type, props: props ?? {} } }
-  const window = {
-    location: { href: `https://admin.fixture/writings/edit/?draft=${DRAFT}`, origin: 'https://admin.fixture', pathname: '/writings/edit/', search: `?draft=${DRAFT}` },
-    history: { state: { route: 'editor' }, pushState(state, unused, url) { pushes.push({ state, url }); this.state = state; window.location.href = String(url) } },
-    sessionStorage: { getItem: key => stored.get(key) ?? null, setItem: (key, value) => stored.set(key, value), removeItem: key => stored.delete(key) },
-    confirm() { confirmCount++; return confirmation },
-    addEventListener(type, listener) { events.set(type, listener) }, removeEventListener(type, listener) { if (events.get(type) === listener) events.delete(type) },
-  }
-  const document = {
-    addEventListener(type, listener) { documentEvents.set(type, listener) }, removeEventListener(type, listener) { if (documentEvents.get(type) === listener) documentEvents.delete(type) },
-    createElement() { const anchor = { href: '', download: '', click() { downloads.push({ href: anchor.href, download: anchor.download }) } }; return anchor },
-  }
-  class Element { constructor(anchor) { this.anchor = anchor } closest() { return this.anchor } }
-  const navigator = { onLine: true, clipboard: { async writeText(value) { copies.push(value) } } }
-  function load(relative, overrides = {}) {
-    const filename = path.resolve(__dirname, '../src', relative)
-    if (modules.has(filename)) return modules.get(filename)
-    const module = { exports: {} }, sourceRequire = createRequire(filename)
-    const code = ts.transpileModule(fs.readFileSync(filename, 'utf8'), { fileName: filename, compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText
-    modules.set(filename, module.exports)
-    const context = vm.createContext({ module, exports: module.exports, URL, URLSearchParams, TextEncoder, TextDecoder, Response, Blob, File, FormData, AbortController, AbortSignal, fetch, window, document, navigator, Element, setTimeout: timer, clearTimeout: id => timers.delete(id), crypto: { randomUUID: () => ++uuid % 2 ? DRAFT : OP }, Date: class extends Date { constructor(...args) { super(...(args.length ? args : [clock.now])) } static now() { return clock.now } }, ...globals, require(specifier) {
-      if (overrides[specifier]) return overrides[specifier]
-      if (specifier === 'react') return react
-      if (specifier === 'react/jsx-runtime') return { jsx, jsxs: jsx, Fragment: 'fragment' }
-      if (specifier === '@janeway/ui/button') return { Button: 'button' }
-      if (specifier === 'next/navigation') return { useRouter: () => ({ push: url => pushes.push({ navigation: url }) }), useSearchParams: () => new URLSearchParams(window.location.search) }
-      if (specifier === './session-provider') return { useOwnerSession: () => session }
-      if (specifier === './workspace') return { Workspace: 'workspace' }
-      if (specifier === './writing-editor-provider' && editorHook) return { useWritingEditor: editorHook, WritingTextRecovery: 'text-recovery' }
-      if (specifier.startsWith('.')) { const target = path.resolve(path.dirname(filename), specifier); return load(path.relative(path.resolve(__dirname, '../src'), target + (target.includes('/components/') ? '.tsx' : '.ts'))) }
-      return sourceRequire(specifier)
-    } })
-    new vm.Script(code, { filename }).runInContext(context)
-    return module.exports
-  }
-  function mount(key, component, props = {}) {
-    const scope = { component, props, slots: [], effects: [], cursor: 0, dirty: true, tree: null }
-    scopes.set(key, scope)
-    const render = () => {
-      let count = 0
-      do {
-        if (++count > 50) throw Error('Effect cycle did not settle')
-        active = scope; scope.cursor = 0; scope.effects = []; scope.dirty = false
-        scope.tree = scope.component(scope.props)
-        for (const effect of scope.effects) { scope.slots[effect.index].cleanup?.(); scope.slots[effect.index].cleanup = effect.callback() }
-      } while (scope.dirty)
-      return scope.tree
-    }
-    render()
-    return { render, tree: () => scope.tree, props(value) { scope.props = value; return render() } }
-  }
-  async function settle(instance) { for (let index = 0; index < 8; index++) await Promise.resolve(); return instance.render() }
-  function unmount(key) { const scope = scopes.get(key); for (const slot of scope?.slots ?? []) if (slot?.kind === 'effect') slot.cleanup?.(); scopes.delete(key) }
-  t.after(() => { for (const scope of scopes.values()) for (const slot of scope.slots) if (slot?.kind === 'effect') slot.cleanup?.() })
-  return { load, mount, unmount, settle, window, document, events, documentEvents, copies, downloads, pushes, stored, Element, setSession(value) { session = value }, setEditorHook(value) { editorHook = value }, confirm(value) { confirmation = value }, confirmCount: () => confirmCount, advance(milliseconds) { clock.now += milliseconds; for (const [id, pending] of timers) if (pending.due <= clock.now) { timers.delete(id); pending.fn() } } }
-}
+const { NOW, OWNER, DRAFT, REVISION, NEXT_REVISION, OP, ORIGIN, draft, metadata, text, nodes, harness } = require('./writing-ui-harness.cjs')
 
 test('root provider guards real link, history and hard navigation and retains recoverable text before authentication UI', async t => {
   const h = harness(t)
@@ -189,7 +92,7 @@ test('preview failure never injects a public or unsaved fallback', async t => {
   assert.match(text(instance.tree()), /No public content or unsaved-source fallback/)
 })
 
-test('library loads summaries only until explicit New or Fork actions and lost create responses require read-only outcome lookup', async t => {
+test('library creation keeps recovery IDs and locks duplicate creation until a read-only outcome check', async t => {
   const h = harness(t), api = h.load('lib/writing-drafts.ts'), controller = new api.WritingEditorController(), calls = []
   h.setEditorHook(() => ({ controller, state: controller.getSnapshot() }))
   const client = {
@@ -199,11 +102,11 @@ test('library loads summaries only until explicit New or Fork actions and lost c
     async getWritingOperation(operationId) { calls.push({ type: 'outcome', operationId }); return { operationId, status: 'committed', draftId: DRAFT, createdAt: new Date(NOW).toISOString(), result: metadata() } },
   }
   h.setSession({ client, snapshot: { status: 'authenticated', session: { owner: { sub: OWNER } } } })
-  const component = h.load('components/writings-workspace.tsx').WritingsWorkspace, instance = h.mount('library', component)
+  const instance = h.mount('library', h.load('components/writings-workspace.tsx').WritingsWorkspace)
   await h.settle(instance)
   assert.deepEqual(calls.map(call => call.type), ['list'])
-  assert.equal(nodes(instance.tree(), node => node.type === 'h1' && node.props.className === 'sr-only').length, 1)
-  nodes(instance.tree(), node => node.type === 'button' && text(node) === 'New draft')[0].props.onClick(); await h.settle(instance)
+  const newWriting = nodes(instance.tree(), node => node.type === 'button' && text(node) === 'New writing')[0]
+  newWriting.props.onClick(); newWriting.props.onClick(); await h.settle(instance)
   const create = calls.find(call => call.type === 'create')
   assert.equal(create.input.sourceMdx, '')
   assert.equal(create.input.targetSlug, '')
@@ -211,68 +114,204 @@ test('library loads summaries only until explicit New or Fork actions and lost c
   assert.equal(create.operationId, OP)
   assert.equal(h.pushes.filter(item => item.navigation).length, 0)
   assert.deepEqual(JSON.parse([...h.stored.values()][0]), { operationId: OP, draftId: DRAFT })
-  assert.equal(nodes(instance.tree(), node => node.type === 'button' && text(node) === 'New draft')[0].props.disabled, true)
-  nodes(instance.tree(), node => node.type === 'button' && text(node) === 'Check create outcome')[0].props.onClick(); await h.settle(instance)
+  assert.equal(nodes(instance.tree(), node => node.type === 'button' && text(node) === 'New writing')[0].props.disabled, true)
+  nodes(instance.tree(), node => node.type === 'button' && text(node) === 'Check status')[0].props.onClick(); await h.settle(instance)
   assert.deepEqual(calls.map(call => call.type), ['list', 'create', 'outcome'])
-  assert.match(text(instance.tree()), /confirmed.*saved privately/)
+  assert.equal(nodes(instance.tree(), node => node.props.href === `/writings/edit/?draft=${DRAFT}`).length, 1)
   assert.equal(h.stored.size, 0)
   assert.equal(calls.filter(call => call.type === 'create').length, 1)
 })
 
-test('fork source is an explicit authenticated read and unsupported bundles cannot trigger private fork creation', async t => {
+test('published copy review reads the authenticated source and blocks unsupported bundles', async t => {
   const h = harness(t), api = h.load('lib/writing-drafts.ts'), controller = new api.WritingEditorController(), calls = [], key = `articles/fixture-writing/revisions/${REVISION}/page.mdx`
   h.setEditorHook(() => ({ controller, state: controller.getSnapshot() }))
   const client = {
     publicationScope: 'scope', async listWritingDrafts() { return { drafts: [], cursor: null } },
     async listPublishedWritings() { calls.push('published-list'); return { writings: [{ slug: 'fixture-writing', title: 'Owner article', s3Key: key }], cursor: null } },
     async getPublishedWriting(slug) { calls.push('published-source'); return { slug, title: 'Owner article', s3Key: key, sourceMdx: 'Exact original public MDX', assets: [], unsupportedAssets: [{ name: 'animation.gif', reason: 'unsupported image type' }] } },
-    async createWritingDraft() { calls.push('mutation'); throw Error('unsupported fork must not be dispatched') },
+    async createWritingDraft() { calls.push('mutation'); throw Error('unsupported copy must not be dispatched') },
   }
   h.setSession({ client, snapshot: { status: 'authenticated', session: { owner: { sub: OWNER } } } })
   const instance = h.mount('library', h.load('components/writings-workspace.tsx').WritingsWorkspace)
   await h.settle(instance)
-  nodes(instance.tree(), node => node.type === 'button' && text(node) === 'Fork published writing')[0].props.onClick(); await h.settle(instance)
+  assert.deepEqual(calls, [])
+  nodes(instance.tree(), node => node.props.role === 'tab' && text(node) === 'Published')[0].props.onClick(); await h.settle(instance)
   assert.deepEqual(calls, ['published-list'])
-  nodes(instance.tree(), node => node.type === 'button' && text(node) === 'Review source')[0].props.onClick(); await h.settle(instance)
+  nodes(instance.tree(), node => node.type === 'button' && text(node).startsWith('Edit a copy'))[0].props.onClick(); await h.settle(instance)
   assert.deepEqual(calls, ['published-list', 'published-source'])
   assert.equal(nodes(instance.tree(), node => node.type === 'textarea')[0].props.value, 'Exact original public MDX')
-  assert.equal(nodes(instance.tree(), node => node.type === 'button' && text(node) === 'Create private fork')[0].props.disabled, true)
-  assert.match(text(instance.tree()), /Nothing will be silently dropped or rewritten/)
-  assert.match(text(instance.tree()), /animation.gif/)
+  assert.equal(nodes(instance.tree(), node => node.type === 'button' && text(node) === 'Create private copy')[0].props.disabled, true)
+  assert.deepEqual(calls, ['published-list', 'published-source'])
 })
 
-test('late image validation cannot attach a private capability after the asset manager leaves its authenticated scope', async t => {
-  let xhr
-  class PrivateTransfer {
-    constructor() { xhr = this; this.upload = {}; this.status = 201 }
-    open(method, url) { this.method = method; this.url = url }
-    send(form) { this.form = form }
-    getResponseHeader(name) { return name === 'x-amz-version-id' ? 'exact-image-version' : null }
-    abort() { this.aborted = true }
-  }
-  const h = harness(t, { XMLHttpRequest: PrivateTransfer }), api = h.load('lib/writing-drafts.ts'), controller = new api.WritingEditorController(), validation = Promise.withResolvers(), calls = []
-  const assetId = '53cfb5e9-7e06-4b92-8524-f0c6ba5f0ad1', key = `drafts/${OWNER}/${DRAFT}/assets/${assetId}/image`
+test('supported published copies use the server copy input and open the committed private draft', async t => {
+  const h = harness(t), calls = [], key = `articles/fixture-writing/revisions/${REVISION}/page.mdx`
+  h.setEditorHook(() => ({ controller: { hasProtectedWork: () => false } }))
   const client = {
-    async getWritingDraft() { return draft() },
-    async authorizeWritingAsset() { calls.push('authorize'); return { assetId, upload: { url: ORIGIN + '/', maxBytes: api.MAX_ASSET_BYTES, expiresAt: new Date(NOW + 300000).toISOString(), fields: { key, 'Content-Type': 'image/png', success_action_status: '201', 'x-amz-server-side-encryption': 'AES256' } } } },
-    async validateWritingAsset(draftId, selectedAssetId, versionId, signal) { calls.push({ type: 'validate', draftId, selectedAssetId, versionId, signal }); return validation.promise },
+    publicationScope: 'scope', async listWritingDrafts() { return { drafts: [], cursor: null } },
+    async listPublishedWritings() { return { writings: [{ slug: 'fixture-writing', title: 'Owner article', s3Key: key }], cursor: null } },
+    async getPublishedWriting(slug) { return { slug, title: 'Owner article', s3Key: key, sourceMdx: 'Original public MDX', assets: [{ name: 'cover.png', bytes: 24, contentType: 'image/png' }], unsupportedAssets: [] } },
+    async createWritingDraft(input, operationId) { calls.push(JSON.parse(JSON.stringify({ input, operationId }))); return { operationId, status: 'committed', draftId: input.draftId, createdAt: new Date(NOW).toISOString(), result: metadata() } },
   }
-  await controller.open(client, DRAFT, OWNER)
-  h.setEditorHook(() => ({ controller, state: controller.getSnapshot() }))
-  const instance = h.mount('assets', h.load('components/writings-assets.tsx').WritingsAssets, { client, draftId: DRAFT, ownerSub: OWNER })
-  nodes(instance.tree(), node => node.type === 'input' && node.props.type === 'file')[0].props.onChange({ currentTarget: { files: [new File([new Uint8Array(100)], 'image.png', { type: 'image/png' })] } })
+  h.setSession({ client, snapshot: { status: 'authenticated', session: { owner: { sub: OWNER } } } })
+  const instance = h.mount('library', h.load('components/writings-workspace.tsx').WritingsWorkspace)
   await h.settle(instance)
-  assert.equal(xhr.url, ORIGIN + '/')
-  assert.equal(xhr.form.has('Authorization'), false)
-  xhr.onload()
-  await h.settle(instance)
-  const validate = calls.find(call => call.type === 'validate')
-  assert.equal(validate.versionId, 'exact-image-version')
-  h.unmount('assets')
-  assert.equal(validate.signal.aborted, true)
-  validation.resolve({ assetId, name: 'image.png', key, versionId: 'exact-image-version', sha256: 'a'.repeat(64), bytes: 100, contentType: 'image/png', width: 10, height: 10 })
-  for (let index = 0; index < 8; index++) await Promise.resolve()
-  assert.equal(controller.getSnapshot().working.assets.length, 0)
-  assert.equal(controller.getSnapshot().availableAssets.length, 0)
-  assert.equal(controller.getSnapshot().dirty, false)
+  nodes(instance.tree(), node => node.props.role === 'tab' && text(node) === 'Published')[0].props.onClick(); await h.settle(instance)
+  nodes(instance.tree(), node => node.type === 'button' && text(node).startsWith('Edit a copy'))[0].props.onClick(); await h.settle(instance)
+  assert.equal(calls.length, 0)
+  const copy = nodes(instance.tree(), node => node.type === 'button' && text(node) === 'Create private copy')[0]
+  assert.equal(copy.props.disabled, false)
+  copy.props.onClick(); await h.settle(instance)
+  assert.deepEqual(calls, [{ input: { draftId: DRAFT, fromPublishedSlug: 'fixture-writing' }, operationId: OP }])
+  assert.deepEqual(h.pushes, [{ navigation: `/writings/edit/?draft=${DRAFT}` }])
+  assert.equal(h.stored.size, 0)
 })
+
+test('library filters only available labels, titles and slugs and identifies partial search accessibly', async t => {
+  const h = harness(t), secondId = '53cfb5e9-7e06-4b92-8524-f0c6ba5f0ad1', sourceReads = []
+  h.setEditorHook(() => ({ controller: { hasProtectedWork: () => false } }))
+  const client = {
+    async listWritingDrafts() { return { drafts: [{ ...metadata(), label: 'Orchard notes', targetSlug: 'autumn-harvest' }, { ...metadata(), draftId: secondId, label: 'Sea journal', targetSlug: 'coastal-walk' }], cursor: 'next_drafts' } },
+    async listPublishedWritings() { return { writings: [{ title: 'Garden journal', slug: 'spring-blooms', s3Key: 'secret-revision' }, { title: 'Mountain essay', slug: 'winter-trail', s3Key: 'other-revision' }], cursor: 'next_published' } },
+    async getPublishedWriting() { sourceReads.push('source'); throw Error('filtering must not read MDX') },
+  }
+  h.setSession({ client, snapshot: { status: 'authenticated', session: { owner: { sub: OWNER } } } })
+  const instance = h.mount('library', h.load('components/writings-workspace.tsx').WritingsWorkspace)
+  await h.settle(instance)
+  const panel = value => nodes(instance.tree(), node => node.props.id === `writing-library-panel-${value}`)[0]
+  const rows = value => nodes(panel(value), node => node.type === 'li')
+  const search = value => { nodes(instance.tree(), node => node.type === 'input' && node.props.type === 'search')[0].props.onChange({ currentTarget: { value } }); instance.render() }
+  assert.equal(rows('drafts').length, 2)
+  search(' ORCHARD ')
+  assert.equal(rows('drafts').length, 1)
+  assert.equal(nodes(rows('drafts')[0], node => node.props.href)[0].props.href, `/writings/edit/?draft=${DRAFT}`)
+  let input = nodes(instance.tree(), node => node.type === 'input')[0]
+  assert.ok(input.props['aria-describedby'])
+  assert.equal(nodes(instance.tree(), node => node.props.id === input.props['aria-describedby']).length, 1)
+  search('COASTAL')
+  assert.equal(nodes(rows('drafts')[0], node => node.props.href)[0].props.href, `/writings/edit/?draft=${secondId}`)
+  search('not-found')
+  assert.equal(rows('drafts').length, 0)
+  assert.equal(nodes(panel('drafts'), node => node.props.role === 'status').length, 1)
+  assert.equal(nodes(panel('drafts'), node => node.props.role === 'alert').length, 0)
+  nodes(instance.tree(), node => node.props.role === 'tab' && text(node) === 'Published')[0].props.onClick(); await h.settle(instance)
+  search('garden')
+  assert.equal(rows('published').length, 1)
+  assert.match(text(rows('published')[0]), /Garden journal/)
+  search('WINTER')
+  assert.equal(rows('published').length, 1)
+  assert.match(text(rows('published')[0]), /winter-trail/)
+  search('secret-revision')
+  assert.equal(rows('published').length, 0)
+  assert.deepEqual(sourceReads, [])
+  search('')
+  input = nodes(instance.tree(), node => node.type === 'input')[0]
+  assert.equal(input.props['aria-describedby'], undefined)
+  assert.equal(rows('published').length, 2)
+})
+
+test('keyboard tab transitions fetch published summaries lazily and retain both paginated libraries', async t => {
+  const h = harness(t), calls = [], firstPublished = Promise.withResolvers(), secondId = '53cfb5e9-7e06-4b92-8524-f0c6ba5f0ad1'
+  h.setEditorHook(() => ({ controller: { hasProtectedWork: () => false } }))
+  const first = { ...metadata(), label: 'First draft' }, second = { ...metadata(), draftId: secondId, label: 'Second draft' }
+  const article = { title: 'First article', slug: 'first-article', s3Key: 'first-key' }, nextArticle = { title: 'Second article', slug: 'second-article', s3Key: 'second-key' }
+  const client = {
+    async listWritingDrafts(cursor) { calls.push({ type: 'drafts', cursor }); return cursor ? { drafts: [first, second], cursor: null } : { drafts: [first], cursor: 'draft_page_2' } },
+    async listPublishedWritings(cursor) { calls.push({ type: 'published', cursor }); return cursor ? { writings: [article, nextArticle], cursor: null } : firstPublished.promise },
+  }
+  h.setSession({ client, snapshot: { status: 'authenticated', session: { owner: { sub: OWNER } } } })
+  const instance = h.mount('library', h.load('components/writings-workspace.tsx').WritingsWorkspace)
+  await h.settle(instance)
+  assert.deepEqual(calls, [{ type: 'drafts', cursor: undefined }])
+  nodes(instance.tree(), node => node.type === 'button' && text(node) === 'Load more drafts')[0].props.onClick(); await h.settle(instance)
+  const panel = value => nodes(instance.tree(), node => node.props.id === `writing-library-panel-${value}`)[0]
+  assert.equal(nodes(panel('drafts'), node => node.type === 'li').length, 2)
+  const domTabs = [0, 1].map(index => ({ focus() { h.document.activeElement = domTabs[index] } }))
+  h.document.activeElement = domTabs[0]
+  let prevented = false
+  nodes(instance.tree(), node => node.props.role === 'tablist')[0].props.onKeyDown({ key: 'ArrowRight', currentTarget: { querySelectorAll: () => domTabs }, preventDefault() { prevented = true } })
+  instance.render()
+  assert.equal(prevented, true)
+  assert.equal(h.document.activeElement, domTabs[1])
+  assert.equal(panel('published').props.hidden, false)
+  assert.equal(panel('drafts').props.hidden, true)
+  nodes(instance.tree(), node => node.props.role === 'tab' && text(node) === 'Published')[0].props.onClick()
+  assert.equal(calls.filter(call => call.type === 'published').length, 1)
+  firstPublished.resolve({ writings: [article], cursor: 'published_page_2' }); await h.settle(instance)
+  nodes(instance.tree(), node => node.type === 'button' && text(node) === 'Load more published writings')[0].props.onClick(); await h.settle(instance)
+  assert.equal(nodes(panel('published'), node => node.type === 'li').length, 2)
+  nodes(instance.tree(), node => node.props.role === 'tab' && text(node) === 'Drafts')[0].props.onClick(); instance.render()
+  assert.equal(nodes(panel('drafts'), node => node.type === 'li').length, 2)
+  nodes(instance.tree(), node => node.props.role === 'tab' && text(node) === 'Published')[0].props.onClick(); await h.settle(instance)
+  assert.equal(nodes(panel('published'), node => node.type === 'li').length, 2)
+  assert.deepEqual(calls, [{ type: 'drafts', cursor: undefined }, { type: 'drafts', cursor: 'draft_page_2' }, { type: 'published', cursor: undefined }, { type: 'published', cursor: 'published_page_2' }])
+  nodes(instance.tree(), node => node.type === 'input')[0].props.onChange({ currentTarget: { value: 'article' } }); instance.render()
+  assert.equal(nodes(instance.tree(), node => node.type === 'input')[0].props['aria-describedby'], undefined)
+})
+
+test('pagination errors retain summaries and retry the failed cursor rather than dropping earlier pages', async t => {
+  const h = harness(t), calls = [], failures = { drafts: true, published: true }, secondId = '53cfb5e9-7e06-4b92-8524-f0c6ba5f0ad1'
+  h.setEditorHook(() => ({ controller: { hasProtectedWork: () => false } }))
+  const client = {
+    async listWritingDrafts(cursor) {
+      calls.push({ type: 'drafts', cursor })
+      if (!cursor) return { drafts: [metadata()], cursor: 'draft_page_2' }
+      if (failures.drafts) { failures.drafts = false; throw Error('page unavailable') }
+      return { drafts: [{ ...metadata(), draftId: secondId }], cursor: null }
+    },
+    async listPublishedWritings(cursor) {
+      calls.push({ type: 'published', cursor })
+      if (!cursor) return { writings: [{ title: 'First article', slug: 'first-article', s3Key: 'first-key' }], cursor: 'published_page_2' }
+      if (failures.published) { failures.published = false; throw Error('page unavailable') }
+      return { writings: [{ title: 'Second article', slug: 'second-article', s3Key: 'second-key' }], cursor: null }
+    },
+  }
+  h.setSession({ client, snapshot: { status: 'authenticated', session: { owner: { sub: OWNER } } } })
+  const instance = h.mount('library', h.load('components/writings-workspace.tsx').WritingsWorkspace)
+  await h.settle(instance)
+  const panel = value => nodes(instance.tree(), node => node.props.id === `writing-library-panel-${value}`)[0]
+  nodes(instance.tree(), node => node.type === 'button' && text(node) === 'Load more drafts')[0].props.onClick(); await h.settle(instance)
+  assert.equal(nodes(panel('drafts'), node => node.type === 'li').length, 1)
+  assert.equal(nodes(panel('drafts'), node => node.props.role === 'alert').length, 1)
+  nodes(instance.tree(), node => node.type === 'button' && text(node) === 'Retry drafts')[0].props.onClick(); await h.settle(instance)
+  assert.equal(nodes(panel('drafts'), node => node.type === 'li').length, 2)
+  nodes(instance.tree(), node => node.props.role === 'tab' && text(node) === 'Published')[0].props.onClick(); await h.settle(instance)
+  nodes(instance.tree(), node => node.type === 'button' && text(node) === 'Load more published writings')[0].props.onClick(); await h.settle(instance)
+  assert.equal(nodes(panel('published'), node => node.type === 'li').length, 1)
+  assert.equal(nodes(panel('published'), node => node.props.role === 'alert').length, 1)
+  nodes(instance.tree(), node => node.type === 'button' && text(node) === 'Retry published writings')[0].props.onClick(); await h.settle(instance)
+  assert.equal(nodes(panel('published'), node => node.type === 'li').length, 2)
+  assert.deepEqual(calls.map(call => call.cursor), [undefined, 'draft_page_2', 'draft_page_2', undefined, 'published_page_2', 'published_page_2'])
+})
+
+test('owner changes abort library/source reads and discard their late results and search state', async t => {
+  const h = harness(t), source = Promise.withResolvers(), nextPage = Promise.withResolvers(), requests = [], secondId = '53cfb5e9-7e06-4b92-8524-f0c6ba5f0ad1'
+  h.setEditorHook(() => ({ controller: { hasProtectedWork: () => false } }))
+  let owner = OWNER
+  const client = {
+    async listWritingDrafts() { return { drafts: [{ ...metadata(), draftId: owner === OWNER ? DRAFT : secondId }], cursor: null } },
+    async listPublishedWritings(cursor, signal) { if (cursor) { requests.push(signal); return nextPage.promise } return { writings: [{ title: 'Owner article', slug: 'fixture-writing', s3Key: 'source-key' }], cursor: 'page_2' } },
+    async getPublishedWriting(slug, signal) { requests.push(signal); return source.promise },
+  }
+  h.setSession({ client, snapshot: { status: 'authenticated', session: { owner: { sub: owner } } } })
+  const instance = h.mount('library', h.load('components/writings-workspace.tsx').WritingsWorkspace)
+  await h.settle(instance)
+  nodes(instance.tree(), node => node.props.role === 'tab' && text(node) === 'Published')[0].props.onClick(); await h.settle(instance)
+  nodes(instance.tree(), node => node.type === 'button' && text(node).startsWith('Edit a copy'))[0].props.onClick(); instance.render()
+  nodes(instance.tree(), node => node.type === 'button' && text(node) === 'Load more published writings')[0].props.onClick(); instance.render()
+  nodes(instance.tree(), node => node.type === 'input')[0].props.onChange({ currentTarget: { value: 'owner' } }); instance.render()
+  owner = 'another-owner'
+  h.setSession({ client, snapshot: { status: 'authenticated', session: { owner: { sub: owner } } } }); await h.settle(instance)
+  assert.equal(requests.length, 2)
+  assert.equal(requests.every(signal => signal.aborted), true)
+  source.resolve({ title: 'OLD OWNER SOURCE', slug: 'fixture-writing', s3Key: 'old-key', sourceMdx: 'OLD PRIVATE SOURCE', assets: [], unsupportedAssets: [] })
+  nextPage.resolve({ writings: [{ title: 'OLD OWNER ARTICLE', slug: 'old-article', s3Key: 'old-key' }], cursor: null })
+  await h.settle(instance)
+  assert.equal(nodes(instance.tree(), node => node.type === 'textarea').length, 0)
+  assert.equal(nodes(instance.tree(), node => node.type === 'input')[0].props.value, '')
+  assert.equal(nodes(instance.tree(), node => node.props.href === `/writings/edit/?draft=${DRAFT}`).length, 0)
+  assert.equal(nodes(instance.tree(), node => node.props.href === `/writings/edit/?draft=${secondId}`).length, 1)
+  assert.equal(nodes(instance.tree(), node => node.props.id === 'writing-library-panel-published')[0].props.hidden, true)
+  assert.equal(nodes(nodes(instance.tree(), node => node.props.id === 'writing-library-panel-published')[0], node => node.type === 'li').length, 0)
+})
+

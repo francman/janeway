@@ -16,6 +16,10 @@ async function main() {
     const csp = response.headers.get('content-security-policy') || ''
     assert.match(csp, /frame-ancestors 'none'/)
     assert.match(csp, /object-src 'none'/)
+    const frames = (csp.match(/(?:^|;)\s*frame-src\s+([^;]+)/)?.[1] || '').split(/\s+/)
+    for (const pdfOrigin of ['https://www.frankmanu.com', 'https://d343w34l5jqzb2.cloudfront.net']) {
+      assert.ok(frames.includes(pdfOrigin), `${route} must allow the published résumé redirect and PDF frame`)
+    }
     const scripts = csp.match(/(?:^|;)\s*script-src\s+([^;]+)/)?.[1] || ''
     assert.ok(scripts.includes("'self'"))
     assert.ok(!scripts.includes("'unsafe-inline'") && !scripts.includes("'unsafe-eval'"))

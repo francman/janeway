@@ -202,12 +202,24 @@ GitHub Actions runner minutes and artifact storage depend on account allowances.
 ## Owner dashboard
 
 `apps/admin` is the separate personal dashboard for
-`https://frank.frankmanu.com`. It uses the approved compact sidebar/topbar,
-light/dark theme and mobile drawer. Its avatar reuses `src/images/avatar.jpg`;
-the sidebar and top-bar separators share a 72px header band. Presentation omits
-the Website Admin, Read Only and Owner Access labels without changing permissions.
+`https://frank.frankmanu.com`. The desktop sidebar links Résumé, Writings and
+Metrics and includes public-site, sign-out and browser-forgetting actions.
+A mobile drawer provides the same navigation. On the résumé page the compact top
+bar contains Current résumé / New résumé tabs, the theme toggle and mobile
+navigation control. There is no Workspace/page breadcrumb or duplicate tab row.
 The footer has no status slogan: its separator and name sit at the bottom of
 short pages and follow the content on longer pages, without overlaying controls.
+
+The résumé page is the dashboard presentation reference. Writings, the Markdown
+editor and Metrics use the same control/details rail on the left and working
+content or results on the right, stacking vertically on phones. Shared admin CSS
+provides `workspace-split`, `workspace-tabs`, `workspace-tab`, `panel-heading`,
+`panel-icon` and `panel-meta` alongside the existing `panel`, `auth-input`, badge
+and Button styles. Save/search/range controls remain in the relevant left panel;
+editing, previews, result lists and charts use the right-hand panels. Sidebar,
+keyboard tabs, source preservation, save/recovery guards and truthful analytics
+states are unchanged. Shared public-site Button styles are not overridden.
+
 Résumé metadata and publication come from the owner API; public viewing uses
 `/resume.pdf`. Private writing drafts/editor/reviewed publishing and the Metrics
 adapter are deployed: admin Amplify job **11** succeeded on 2026-10-11, revision
@@ -233,21 +245,69 @@ The dashboard does not import the portfolio shell or public PostHog provider.
 
 ### Private writing drafts and reviewed articles
 
-The Writings library explicitly creates a new private draft or forks a selected
-published writing. It never imports repository/live articles automatically.
-`/writings/edit/?draft=<UUID>` is a fixed static-export route with owner-private
-strong reads, canonical MDX source, surgical inline frontmatter controls, private
-PNG/JPEG/WebP attachments and saved-revision sandboxed preview. Incomplete
-drafts remain saveable. Existing article slugs/bases stay locked.
+The Writings library has **Drafts** and **Published** tabs, metadata search,
+updated timestamps and a primary **New writing** action. Search filters the
+records already loaded, with a partial-library notice and pagination when more
+records are available. **Edit a copy** reads a selected published writing and
+creates a private copy only after an explicit action; it never changes the
+public article or automatically imports repository/live source.
 
-**Save private draft** freezes its input, saved revision and operation UUID.
+`/writings/edit/?draft=<UUID>` provides **Write**, **Preview** and **Details**
+tabs. Write edits the Markdown body with Bold, Italic, H2, list, link and code
+controls, plus **Cmd/Ctrl+B/I/K** shortcuts. Complete leading YAML frontmatter
+and BOM are hidden from the body view and preserved byte-for-byte; incomplete
+frontmatter remains editable. Details contains metadata, surgical frontmatter
+controls, a full canonical-source editor, saved-source inspection and
+export/discard tools. Incomplete drafts remain saveable, and existing article
+slugs/bases stay locked.
+
+**Import Markdown** accepts `.md`, `.markdown` and `.mdx` files up to 256 KiB
+using strict UTF-8 decoding. It preserves BOM and line endings, confirms before
+replacing nonempty source, and discards a stale read if the document or owner
+changes. Importing replaces text only; neighboring image files are not read or
+uploaded automatically, and existing attachment references are retained.
+
+**Image** is available in the Write toolbar. PNG/JPEG/WebP uploads use the
+existing private immutable-version validation pipeline, then insert a safely
+encoded relative Markdown reference at the current caret and attach its owned
+receipt in the same working-source update. Typing during upload is retained;
+Save and import are gated until insertion completes. The Images disclosure
+supports inserting existing images, private inspection and explicit attachment
+removal. Removal does not rewrite Markdown or retained history. Uploading or
+inserting an image never saves or publishes the writing automatically.
+
+Metrics are source-body estimates, not rendered-MDX parsing. Leading complete
+frontmatter is excluded; unclosed frontmatter has no countable body yet. Code,
+component attributes and URLs can contribute words. Contiguous Unicode letter/
+number sequences count as words, with internal apostrophes/hyphens retained;
+there is no language-specific segmentation. Reading time rounds up at 200 words
+per minute, with zero minutes for an empty body.
+
+**Save draft**, including **Cmd/Ctrl+S**, uses the same guarded explicit save
+path: it freezes input, saved revision and operation UUID. There is no autosave.
 Concurrent saves conflict, lost responses require read-only outcome checks,
 and **Saved** means durable server acknowledgement, not browser memory.
-The root editor retains unsaved text on expiry with explicit copy/export before
-reauthentication and protects dirty internal/history/refresh navigation.
+Preview activates the saved-revision sandbox automatically; unsaved text is
+never silently saved or substituted into the preview. Presentation tabs retain
+working text and rendered previews; revision changes invalidate stale previews.
+
+The root editor retains unsaved text on expiry with copy/export recovery and
+protects dirty internal/history/refresh navigation. Recovery controls surface
+only when relevant; normal writing does not show revision/operation hashes.
 Only scoped draft/operation UUIDs persist; MDX, tokens and signed image grants
 are not placed in localStorage. Multiline/complex YAML remains source-only;
-untouched source, comments and mixed line endings must not be reserialized.
+untouched source, comments and mixed line endings are not reserialized.
+
+The focused layout takes its cue from
+[Ghost's preview workflow](https://ghost.org/help/publishing-content/).
+The compact authoring controls borrow from Quip's
+[formatting bar](https://quip.com/blog/formatting),
+[Markdown support](https://quip.com/blog/markdown) and
+[in-document image picker](https://quip.com/blog/new-feature-rich-media-picker),
+without changing Markdown into a separate rich-document format.
+The existing explicit-save/recovery model is retained rather than copying
+[WordPress autosave and revisions](https://wordpress.com/support/page-post-revisions/)
+without a storage-policy change.
 
 **Review and publish** compares the clean saved snapshot and actual preview to
 the captured live base, then requires unchecked explicit approval. It never
@@ -289,12 +349,26 @@ blocking, retention and ingestion delay can affect coverage, and bot/internal
 exclusion is not claimed. Owner approval of these definitions remains in app #19.
 
 
-### Private résumé upload and preview
+### Résumé selection and preview
 
 The résumé workspace supports selecting an unencrypted PDF up to 10 MiB,
-local browser preview, direct private S3 upload with progress, pinned-version
-server validation and private preview of the exact validated version.
-Upload and validation alone never change the public résumé or claim publication.
+local browser preview and one **Publish résumé** action. Upload, pinned-version
+validation and publication run automatically after that click; there are no
+separate upload, review or approval controls.
+
+The workspace separates **Current résumé** and **New résumé** into
+keyboard-accessible top-bar tabs. Current résumé automatically embeds the
+published PDF without requiring a separate click, with publication metadata in
+a left-hand column on wider screens. The frame follows the stable public URL
+to the immutable PDF CDN; the release CSP permits those two exact origins, and
+a new publication remounts the frame to load the latest PDF.
+The published and selected-local PDF viewers default to whole-page fit.
+On wider screens New résumé places the file picker and publishing button in a
+left column beside the PDF viewer. On phones, controls or current metadata
+stack above their respective viewer. Switching tabs preserves the selected
+file, local preview and in-progress work.
+There is no normal Refresh metadata button; a failed current-publication read
+retains a retry action.
 
 The server grants an exact owner/key/content-type/byte-count POST capability
 for five minutes. The browser must receive `x-amz-version-id` and send that
@@ -303,12 +377,12 @@ Receipt validity is one hour, while signed preview access lasts at most five
 minutes. Staging objects/receipts expire after seven days, with noncurrent
 versions after one day. Retention/deletion is asynchronous.
 
-Blob URLs, grants and receipts are tab-only state and are cleared on
-replacement, logout/unmount and expiry. Preview signed URLs are bearer
-capabilities, not public CDN URLs; never send them to analytics/logs or persist
-them. Previously issued preview links can still work until their expiry after
-logout. Validation is size/signature/encryption/parse/page/checksum checking,
-not malware scanning.
+Local Blob URLs are revoked when the file is replaced, the owner changes or
+signs out, or the uploader unmounts. Upload grants, receipts and signed preview
+URLs remain memory-only. Signed URLs are bearer capabilities, not public CDN
+URLs; never send them to analytics/logs or persist them. Previously issued
+preview links can still work until their expiry after logout. Validation is
+size/signature/encryption/parse/page/checksum checking, not malware scanning.
 
 The release CSP permits only the exact private regional S3 staging origin for
 direct transfers and PDF frames, plus local blob PDF frames. Keep the origin
@@ -317,32 +391,48 @@ to make a preview work. Native PDF viewing depends on browser support/settings.
 The operator and version/recovery contracts are in janeway-infra's runbook;
 [infra #8](https://github.com/francman/janeway-infra/issues/8) records rollout proof.
 
-### Reviewed résumé publication
+### One-click résumé publication
 
-After validation, **Review publication** reads current metadata and freezes its
-pointer ETag alongside the selected PDF's receipt, hash and size. An available
-exact-version preview and a separate unchecked approval box are required before
-**Publish résumé** can send `{validationId,confirm:true}` with the original
-`If-Match` and a fresh UUID `Idempotency-Key`.
+Selecting a PDF only previews it locally. Clicking **Publish résumé** is the
+owner's explicit approval to publish that selected file. The controller
+authorizes and uploads it privately, validates the exact S3 object version,
+checks the validated receipt and reads current metadata to freeze its pointer
+ETag. It then sends `{validationId,confirm:true}` with that original `If-Match`
+and a fresh UUID `Idempotency-Key`. These internal stages preserve the existing
+backend publication contract without requiring a separate review screen or
+approval checkbox.
+
+Current-publication metadata appears only in Current résumé. New résumé shows
+the selected filename and exact byte size directly below Publish résumé,
+including during and after publication. It retains the PDF/10 MiB constraint,
+local preview and Choose/Change PDF control, without workflow instructions or
+staged approval controls; progress, success and errors appear only as needed.
 
 Publishing changes the S3 current pointer, not application code. The stable
 public `/resume.pdf` link opens the current inline PDF in a protected new tab;
 it requires no Git commit, Amplify build or CDN invalidation. Older approved
 revision URLs remain valid.
 
-- A stale review conflicts rather than silently rebasing or overwriting.
+- A stale pointer conflicts rather than silently rebasing or overwriting.
+  A subsequent explicit Publish click reads a fresh pointer and uses a new
+  operation UUID; failures and conflicts never trigger automatic publication.
 - A lost response is **unknown**, not automatically failed or successful.
-  **Check outcome** sends GET only; it never resubmits publication.
-- Only the latest scoped operation UUID persists in per-owner per-tab
-  `sessionStorage` for reload recovery. PDFs, receipts, signed URLs, review
-  metadata and confirmation remain memory-only. Authentication is still required
-  to read the operation; the UUID is not a bearer capability.
-- Recovery remains available after the validation/preview expires. Read and
-  explicitly acknowledge the displayed outcome before dismissing it or starting
-  a fresh review. A newly uncertain result requires fresh acknowledgement.
+  The exceptional **Check status** action sends GET only; it never resubmits
+  publication. File replacement and further publishing stay disabled while the
+  operation is active or unresolved.
+- Before sending publication, the controller persists the scoped operation UUID
+  in per-owner per-tab `sessionStorage`. If that checkpoint cannot be saved, it
+  does not send the publication request. PDFs, receipts, signed URLs and frozen
+  metadata remain memory-only. Authentication is still required to read the
+  operation; the UUID is not a bearer capability.
+- Reload recovery reads the checkpointed operation with GET only, even after
+  validation or preview expiry. Unknown outcomes retain the checkpoint and
+  cannot be discarded by selecting a new file; trustworthy terminal outcomes
+  clear it. Owner changes abort active work and suppress late private state,
+  while any unresolved checkpoint remains scoped to its original owner.
 - `committed` proves this operation committed; matching current metadata proves
   it is still current. `superseded` is a historical commit, not the current PDF.
-- Explicit approval can make a complete validated immutable revision public
+- Clicking Publish can make a complete validated immutable revision public
   before pointer commit. A subsequent conflict/failure preserves the current
   link but does not make that approved revision private again.
 
@@ -376,11 +466,10 @@ does not itself approve or replace the existing production résumé.
   it ends only when the browser/server device is forgotten or password/MFA
   recovery revokes it. A new session still requires the account password;
   private/incognito windows discard local proof when closed.
-- The server checks the signed native `device_key`, authentication classification,
-  current device existence and server-owned recovery timestamp on every private
-  request. Editing browser state cannot restore a deleted/revoked device.
-  Device-auth and refreshed tokens lack the native user-management scope needed
-  to enroll replacement devices without fresh MFA.
+- The server checks the signed native `device_key`, current device existence and
+  server-owned recovery timestamp on every private request. Editing browser state
+  cannot restore a deleted/revoked device. Native Cognito device authentication
+  governs remembered-device sign-in; trust does not depend on custom token claims.
 - Five-minute access tokens refresh serially within the original eight-hour
   authentication ceiling; reloading does not extend it. Reload restores the
   tab checkpoint only after SDK validation and server authorization of
@@ -394,21 +483,23 @@ does not itself approve or replace the existing production résumé.
   out. Failed deletion does not pretend the server forgot the device. The
   advanced local-proof reset forces MFA locally but does not revoke other copies
   of a device credential; use server forgetting or operator recovery for that.
-- Exact issuer/client/access-token/scope/owner/activation checks remain.
-  Enrollment does not grant dashboard access until the operator activates the
-  verified identity. Cognito password recovery stamps server-owned revocation
-  state; MFA recovery also forgets device records. Revoked/deleted device errors
+- Every authenticated user of the dashboard Cognito app may access their own
+  private data, isolated by authenticated subject. Exact issuer/client/access-token,
+  expiry and live device checks remain; no configured-owner or activation policy,
+  custom access scope or synchronous pre-token-generation hook is required.
+  Cognito password recovery stamps server-owned revocation state for the recovering
+  identity; MFA recovery also forgets device records. Revoked/deleted device errors
   clear local trust and require a fresh MFA sign-in.
 - Expiry/denial clears private views. Unavailability hides stale metadata and
   offers retry. Late SDK/token/API responses cannot restore a sealed session.
   Remote revocation is best-effort when offline; already-issued JWTs are not
   instantly invalidated at Gateway, although the backend's live device and
-  activation checks can deny their application access before JWT expiry.
+  recovery checks can deny their application access before JWT expiry.
 
 Static JS/HTML is public, including the default Amplify hostname; authorization
 protects private API responses. The app rejects noncanonical runtime origins.
-API Gateway validates signatures/issuer/client/scope; Lambda additionally checks
-access-token type, expiry, owner, activation and authoritative device state.
+API Gateway validates signatures/issuer/client; Lambda additionally checks
+access-token type, expiry, authenticated subject and authoritative device state.
 Native Gateway rejections use AWS's own response; integration responses use
 sanitized machine codes and `no-store`. No tokens, signed URLs or private content
 belong in build variables, logs, analytics or release artifacts.

@@ -16,6 +16,16 @@
 
 @layer components {
   .panel { @apply min-w-0 rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-sm shadow-zinc-800/5 dark:border-zinc-700/50 dark:bg-zinc-900; }
+  .workspace-split { @apply grid items-start gap-6; }
+  @screen md {
+    .workspace-split { grid-template-columns: minmax(15rem, 0.8fr) minmax(0, 1.6fr); }
+  }
+  .workspace-tabs { @apply flex min-w-0 gap-3 overflow-x-auto sm:gap-5; }
+  .workspace-tab { @apply min-h-11 shrink-0 whitespace-nowrap border-b-2 border-transparent px-1 py-3 text-sm font-medium text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100; }
+  .workspace-tab[aria-selected='true'] { @apply border-teal-600 text-teal-700 dark:border-teal-400 dark:text-teal-400; }
+  .panel-heading { @apply text-xl font-semibold tracking-tight; }
+  .panel-icon { @apply rounded-xl bg-teal-50 p-3 text-teal-700 dark:bg-teal-950/50 dark:text-teal-400; }
+  .panel-meta { @apply text-xs text-zinc-500 dark:text-zinc-400; }
   .auth-input { @apply mt-2 block min-h-[44px] w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-base text-zinc-900 shadow-sm outline-offset-2 placeholder:text-zinc-400 disabled:opacity-60 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100; }
   .badge { @apply inline-flex items-center rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300; }
   .nav-button { @apply flex min-h-[44px] w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-zinc-600 transition hover:bg-zinc-50 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-100; }

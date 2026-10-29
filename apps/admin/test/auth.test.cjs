@@ -38,7 +38,7 @@ const prefix = `CognitoIdentityServiceProvider.${config.clientId}.`
 const user = {
   accessToken: 'synthetic-access', sub: 'owner-sub', username: 'canonical-owner',
   authTime: 1000, expiresAt: 1300, issuer: config.authority, clientId: config.clientId,
-  scope: 'janeway-admin/access aws.cognito.signin.user.admin', deviceKey: 'us-east-1_device', loginKind: 'fresh',
+  deviceKey: 'us-east-1_device',
 }
 const device = { key: user.deviceKey, createdAt: new Date(1000_000).toISOString() }
 const session = { owner: { sub: user.sub }, authenticatedAt: 1000, expiresAt: 1300, device }
@@ -73,7 +73,7 @@ async function populate(storage, owner = user) {
 function fixture(t) {
   const state = { now: 1000, refreshes: 0, restores: 0, signIns: 0, clears: 0, requests: [], signOuts: 0, trusts: 0, forgotten: 0, saved: false, restarts: 0, preserveCheckpoint: false }
   let current = { ...user }
-  let refresh = async () => ({ ...current, accessToken: 'synthetic-rotated', expiresAt: state.now + 300, loginKind: 'refresh' })
+  let refresh = async () => ({ ...current, accessToken: 'synthetic-rotated', expiresAt: state.now + 300 })
   let signIn = async () => ({ kind: 'done', user: current })
   let restore = async () => null
   let trust = async () => { state.saved = true; return true }
@@ -98,7 +98,7 @@ function fixture(t) {
 function nativeFixture({ persistent = new Storage(), transactions = new Storage(), now = () => 1000 } = {}) {
   const storage = new DeviceStorage(config, persistent, transactions, now)
   const state = { navigations: [], requests: [], remembers: 0, fetches: [], owner: { ...user } }
-  const token = owner => ({ payload: { token_use: 'access', username: owner.username, sub: owner.sub, auth_time: owner.authTime, exp: owner.expiresAt, iss: owner.issuer, client_id: owner.clientId, scope: owner.scope, device_key: owner.deviceKey, janeway_login_kind: owner.loginKind }, toString: () => owner.accessToken })
+  const token = owner => ({ payload: { token_use: owner.tokenUse ?? 'access', username: owner.username, sub: owner.sub, auth_time: owner.authTime, exp: owner.expiresAt, iss: owner.issuer, client_id: owner.clientId, device_key: owner.deviceKey }, toString: () => owner.accessToken })
   const sdk = {
     signIn: async () => { await populate(storage); return { isSignedIn: true, nextStep: { signInStep: 'DONE' } } },
     confirmSignIn: async () => ({ isSignedIn: false, nextStep: { signInStep: 'CONFIRM_SIGN_IN_WITH_TOTP_CODE' } }),
@@ -429,14 +429,12 @@ test('terminal storage failure cannot prevent local logout or public-homepage na
   assert.deepEqual(f.state.navigations, ['https://www.frankmanu.com/'])
 })
 
-test('device/refresh logins cannot create replacement trust; existing proof is not re-remembered', async () => {
+test('standard tokens can trust a confirmed device; existing proof is not re-remembered', async () => {
   const f = nativeFixture()
-  await f.auth.signIn('owner@example.test', 'synthetic-password')
-  await assert.rejects(f.auth.trust({ ...user, loginKind: 'device' }, session), error => error.code === 'trust-failed')
-  assert.equal(f.state.remembers, 0)
-  await f.auth.trust(user, session)
+  const signedIn = await f.auth.signIn('owner@example.test', 'synthetic-password')
+  await f.auth.trust(signedIn.user, session)
   const original = f.persistent.getItem(f.storage.recordKey)
-  await f.auth.trust({ ...user, loginKind: 'device' }, session)
+  await f.auth.trust(await f.auth.refresh(), session)
   assert.equal(f.state.remembers, 1)
   assert.equal(f.persistent.getItem(f.storage.recordKey), original)
 })
@@ -470,28 +468,27 @@ test('reused or expired TOTP remains retryable; invalid sign-in transaction is t
   assert.ok(!JSON.stringify(f.client.getSnapshot()).includes('in-memory-only-seed'))
 })
 
-test('only backend owner authorization can promote trust or open private data', async t => {
+test('only backend session authorization can promote trust or open private data', async t => {
   const f = fixture(t), pending = deferred(), started = deferred()
   f.setTransport(async () => { started.resolve(); return pending.promise })
   const starting = f.start(true)
   await started.promise
   assert.equal(f.client.getSnapshot().status, 'verifying')
   assert.equal(f.state.trusts, 0)
-  pending.resolve(response({ error: { code: 'OWNER_NOT_ACTIVE', message: 'private-details' } }, 403))
+  pending.resolve(response({ error: { code: 'DEVICE_REVOKED', message: 'private-details' } }, 403))
   await starting
-  assert.equal(f.client.getSnapshot().status, 'denied')
+  assert.equal(f.client.getSnapshot().status, 'expired')
   assert.equal(f.state.trusts, 0)
   assert.equal(f.client.getSnapshot().session, null)
   assert.ok(!JSON.stringify(f.client.getSnapshot()).includes('private-details'))
 })
 
-test('MFA enrollment without owner scope is denied rather than mislabeled expired', async t => {
+test('standard app-user tokens open private data and allow opt-in trust', async t => {
   const f = fixture(t)
-  f.setUser({ ...user, scope: 'aws.cognito.signin.user.admin' })
   await f.start(true)
-  assert.equal(f.client.getSnapshot().status, 'denied')
-  assert.equal(f.state.trusts, 0)
-  assert.equal(f.state.requests.length, 0)
+  assert.equal(f.client.getSnapshot().status, 'authenticated')
+  assert.equal(f.state.trusts, 1)
+  assert.equal(f.client.getSnapshot().session.owner.sub, user.sub)
 })
 
 test('opt-in trust failure is honest and does not invalidate an authorized memory session', async t => {
@@ -540,7 +537,7 @@ test('concurrent owner requests serialize rotation and use the same rotated acce
   f.setRefresh(() => pending.promise)
   const checking = f.client.checkSession(), reading = f.client.loadResume()
   assert.equal(f.state.refreshes, 1)
-  pending.resolve({ ...user, accessToken: 'rotated-access', expiresAt: 1550, loginKind: 'refresh' })
+  pending.resolve({ ...user, accessToken: 'rotated-access', expiresAt: 1550 })
   await Promise.all([checking, reading])
   assert.equal(f.state.refreshes, 1)
   assert.equal(f.client.getSnapshot().status, 'authenticated')
@@ -665,7 +662,7 @@ test('reload keeps the login card busy and opens no private UI until the backend
   assert.equal(f.client.getSnapshot().authBusy, true)
   assert.equal(f.client.getSnapshot().session, null)
   assert.equal(f.state.requests.length, 0)
-  sdkPending.resolve({ ...user, loginKind: 'refresh' })
+  sdkPending.resolve({ ...user })
   await backendStarted.promise
   assert.equal(f.client.getSnapshot().status, 'verifying')
   assert.equal(f.client.getSnapshot().session, null)
@@ -685,9 +682,9 @@ test('reload keeps the login card busy and opens no private UI until the backend
   assert.equal(f.state.requests.length, 1)
 })
 
-test('restoration validates actual scope, client, issuer, device, and authentication ceiling before owner requests', async t => {
+test('restoration validates client, issuer, identity, device, expiry, and authentication ceiling before owner requests', async t => {
   for (const invalid of [
-    { ...user, scope: 'aws.cognito.signin.user.admin' },
+    { ...user, sub: '' },
     { ...user, clientId: 'wrong-client' }, { ...user, issuer: 'https://wrong-pool.example.test' },
     { ...user, deviceKey: '' }, { ...user, username: '' }, { ...user, authTime: 1061 },
     { ...user, expiresAt: 1000 },
@@ -695,7 +692,7 @@ test('restoration validates actual scope, client, issuer, device, and authentica
     const f = fixture(t)
     f.setRestore(async () => invalid)
     await f.client.restore()
-    assert.equal(f.client.getSnapshot().status, invalid.scope === 'aws.cognito.signin.user.admin' ? 'denied' : 'expired')
+    assert.equal(f.client.getSnapshot().status, 'expired')
     assert.equal(f.client.getSnapshot().session, null)
     assert.equal(f.state.requests.length, 0)
     assert.equal(f.state.trusts, 0)
@@ -711,7 +708,6 @@ test('restoration validates actual scope, client, issuer, device, and authentica
 test('restored sessions still obey owner/device revocation and owner-sub binding on the backend', async t => {
   for (const [result, expectedStatus] of [
     [response({ error: { code: 'DEVICE_REVOKED' } }, 403), 'expired'],
-    [response({ error: { code: 'OWNER_NOT_ACTIVE' } }, 403), 'denied'],
     [response({ ...session, owner: { sub: 'not-the-owner' } }), 'unavailable'],
     [response({ ...session, device: { ...device, key: 'wrong-device' } }), 'unavailable'],
     [response({ ...session, authenticatedAt: user.authTime + 1 }), 'expired'],
